@@ -1,4 +1,3 @@
-require('dotenv').config();  // Add this line at the top
 const neo4j = require('neo4j-driver');
 
 const driver = neo4j.driver(
@@ -8,6 +7,9 @@ const driver = neo4j.driver(
 
 async function testConnection() {
     const session = driver.session();
+    console.log('NEO4J_URI:', process.env.NEO4J_URI);
+    console.log('NEO4J_USER:', process.env.NEO4J_USER);
+    console.log('NEO4J_PASSWORD:', process.env.NEO4J_PASSWORD);
     try {
         const result = await session.run('RETURN 1 AS number');
         console.log('Neo4j connection successful:', result.records[0].get('number'));

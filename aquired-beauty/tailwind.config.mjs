@@ -11,7 +11,11 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
-    },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        serif: ['Merriweather', 'serif'],
+      },
+    }
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
 };
