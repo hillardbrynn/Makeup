@@ -22,10 +22,10 @@ const Home = () => {
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <h1 className="text-2xl font-serif font-bold tracking-tight">AQUIRED BEAUTY</h1>
+          <h1 className="text-2xl font-serif font-bold tracking-tight">ACQUIRED BEAUTY</h1>
           <div className="flex gap-8 text-sm font-medium">
             <a href="#" className="hover:text-rose-500 transition-colors">
-              SHOP
+              PRODUCTS
             </a>
             <a href="#" className="hover:text-rose-500 transition-colors">
               QUIZ
@@ -104,18 +104,18 @@ const Home = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid md:grid-cols-4 gap-12">
             <div>
-              <h3 className="font-bold mb-4">AQUIRED BEAUTY</h3>
+              <h3 className="font-bold mb-4">ACQUIRED BEAUTY</h3>
               <p className="text-neutral-400 text-sm">
-                Personalized beauty recommendations for everyone.
+                Personalized beauty recommendations for everyone!
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-4">Shop</h4>
+              <h4 className="font-medium mb-4">Products</h4>
               <ul className="space-y-2 text-neutral-400 text-sm">
                 <li>All Products</li>
-                <li>New Arrivals</li>
+                <li>New Drops</li>
                 <li>Best Sellers</li>
-                <li>Offers</li>
+                <li>Hot Deals</li>
               </ul>
             </div>
             <div>
