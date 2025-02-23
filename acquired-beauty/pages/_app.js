@@ -6,7 +6,7 @@ import supabase from '../lib/supabase';
 import { useRouter } from 'next/router';
 
 // Define which routes require authentication
-const protectedRoutes = ['/dashboard', '/quiz', '/recommendations'];
+const protectedRoutes = ['/dashboard', '/recommendations'];
 // Define public routes that should redirect if user is already logged in
 const authRoutes = ['/auth'];
 
