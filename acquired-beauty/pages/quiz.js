@@ -5,8 +5,8 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 const quizQuestions = [
   {
     id: 1,
-    question: "What's your skin tone?",
-    subtext: "This helps us find your perfect shade match",
+    question: "Hey there! First things first—how would you describe your skin tone?",
+    subtext: "This helps us find your perfect shade match. No pressure, just pick what feels right!",
     options: [
       { id: 'fair', label: 'Fair', description: 'Very light skin that burns easily' },
       { id: 'light', label: 'Light', description: 'Light skin that sometimes tans' },
@@ -18,18 +18,18 @@ const quizQuestions = [
   },
   {
     id: 2,
-    question: "What's your undertone?",
-    subtext: "Look at the veins on your wrist to help determine",
+    question: "What’s your undertone vibe? 💖",
+    subtext: "Take a peek at your wrist—are your veins more blue or green? That’s a hint!",
     options: [
       { id: 'cool', label: 'Cool', description: 'Blue or purple veins, silver jewelry looks best' },
       { id: 'warm', label: 'Warm', description: 'Green veins, gold jewelry looks best' },
-      { id: 'neutral', label: 'Neutral', description: 'Mix of both, both metals look good' }
+      { id: 'neutral', label: 'Neutral', description: 'A mix of both, both metals look good' }
     ]
   },
   {
     id: 3,
-    question: "What's your preferred coverage level?",
-    subtext: "How much coverage do you typically like?",
+    question: "How much coverage are we talking? 💁‍♀️",
+    subtext: "Think of your everyday vibe—do you like a barely-there look or full-on glam?",
     options: [
       { id: 'sheer', label: 'Sheer', description: 'Just a hint of coverage' },
       { id: 'medium', label: 'Medium', description: 'Natural-looking coverage' },
@@ -38,8 +38,8 @@ const quizQuestions = [
   },
   {
     id: 4,
-    question: "What's your skin type?",
-    subtext: "This helps us recommend the right formula",
+    question: "Alright, spill the tea—what’s your skin type? 🧴",
+    subtext: "This helps us recommend formulas that actually vibe with your skin.",
     options: [
       { id: 'oily', label: 'Oily', description: 'Shiny throughout the day' },
       { id: 'dry', label: 'Dry', description: 'Feels tight and flaky' },
@@ -49,14 +49,61 @@ const quizQuestions = [
   },
   {
     id: 5,
-    question: "What are your main concerns?",
-    subtext: "Select all that apply",
+    question: "What are your main skin concerns? (Feel free to select all that apply!) ✨",
+    subtext: "We’ve got you—this helps us recommend products that work for you.",
     multiSelect: true,
     options: [
       { id: 'acne', label: 'Acne', description: 'Breakouts and blemishes' },
       { id: 'aging', label: 'Fine Lines', description: 'Signs of aging' },
       { id: 'dark-spots', label: 'Dark Spots', description: 'Hyperpigmentation' },
-      { id: 'redness', label: 'Redness', description: 'Uneven tone or rosacea' }
+      { id: 'redness', label: 'Redness', description: 'Uneven tone or rosacea' },
+      { id: 'pores', label: 'Pores', description: 'Visible or large pores' },
+      { id: 'texture', label: 'Texture', description: 'Rough or uneven skin texture' }
+    ]
+  },
+  {
+    id: 6,
+    question: "What’s your go-to lip product? 💋",
+    subtext: "Choose the one that you reach for the most!",
+    options: [
+      { id: 'lipstick', label: 'Lipstick', description: 'Classic and bold' },
+      { id: 'gloss', label: 'Lip Gloss', description: 'Shiny and fresh' },
+      { id: 'stain', label: 'Lip Stain', description: 'Long-lasting and subtle' },
+      { id: 'balm', label: 'Lip Balm', description: 'Simple and hydrating' }
+    ]
+  },
+  {
+    id: 7,
+    question: "What’s your eye color? 👀",
+    subtext: "This helps us suggest shades that make your eyes pop!",
+    options: [
+      { id: 'brown', label: 'Brown', description: 'Warm and rich' },
+      { id: 'hazel', label: 'Hazel', description: 'A mix of green and brown' },
+      { id: 'green', label: 'Green', description: 'Bright and vibrant' },
+      { id: 'blue', label: 'Blue', description: 'Cool and striking' },
+      { id: 'gray', label: 'Gray', description: 'Soft and unique' }
+    ]
+  },
+  {
+    id: 8,
+    question: "What’s your makeup vibe? 💄",
+    subtext: "Choose the style that fits your aesthetic the most!",
+    options: [
+      { id: 'natural', label: 'Natural', description: 'Simple and fresh-faced' },
+      { id: 'minimal', label: 'Minimal', description: 'Barely-there with a hint of color' },
+      { id: 'glam', label: 'Glam', description: 'Bold and camera-ready' },
+      { id: 'experimental', label: 'Experimental', description: 'I love trying different looks!' }
+    ]
+  },
+  {
+    id: 9,
+    question: "Last question—how often do you wear makeup? 💁‍♀️",
+    subtext: "We want to recommend products that match your lifestyle!",
+    options: [
+      { id: 'daily', label: 'Daily', description: 'Makeup is part of my everyday routine' },
+      { id: 'few-times', label: 'A few times a week', description: 'I wear makeup pretty regularly' },
+      { id: 'occasionally', label: 'Occasionally', description: 'Only for special events' },
+      { id: 'rarely', label: 'Rarely', description: 'Almost never wear makeup' }
     ]
   }
 ];
