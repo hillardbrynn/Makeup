@@ -164,7 +164,7 @@ export default function Auth() {
                             ) : (
                                 <div className="space-y-2">
                                     <div>
-                                        Don't have an account?{' '}
+                                        Don&apos;t have an account?{' '}
                                         <button
                                             type="button"
                                             onClick={() => setIsSignUp(true)}
