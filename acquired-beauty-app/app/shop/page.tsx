@@ -5,44 +5,196 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import supabase from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
-import { Heart, ShoppingBag, Filter, Search, Star } from 'lucide-react';
+import { Heart, ShoppingBag, Filter, Search, Star, Sparkles } from 'lucide-react';
 
 export default function ShopPage() {
-
   const getProxiedImageUrl = (originalUrl) => {
     return `/api/image?url=${encodeURIComponent(originalUrl)}`;
   };
+  
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [category, setCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [userEmbedding, setUserEmbedding] = useState(null);
+  const [isPersonalized, setIsPersonalized] = useState(false);
+  const [personalizedProducts, setPersonalizedProducts] = useState([]);
+  const [showingPersonalized, setShowingPersonalized] = useState(false);
   const router = useRouter();
 
   // Categories for filter buttons
   const categories = ['all', 'foundation', 'concealer', 'blush', 'eyeshadow', 'mascara', 'lipstick'];
 
+  // Cosine similarity function to measure product match
+  function cosineSimilarity(vecA, vecB) {
+    if (!vecA || !vecB || vecA.length !== vecB.length) {
+      return 0;
+    }
+    
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+    
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+    
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  // Fetch user's quiz embedding
   useEffect(() => {
-    async function fetchProducts() {
+    async function fetchUserQuizEmbedding() {
+      try {
+        // Get current user
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Error fetching session:", sessionError);
+          return null;
+        }
+        
+        if (!session?.user) {
+          console.log("No user logged in - skipping personalization");
+          return null;
+        }
+        
+        const userId = session.user.id;
+        console.log("Fetching quiz embedding for user:", userId);
+        
+        // Get the user's latest quiz data
+        const { data: quizData, error: quizError } = await supabase
+          .from('quiz')
+          .select('id')
+          .eq('user_id', userId)
+          .order('id', { ascending: false })
+          .limit(1);
+        
+        if (quizError) {
+          console.error("Error fetching quiz data:", quizError);
+          return null;
+        }
+        
+        if (!quizData || quizData.length === 0) {
+          console.log("No quiz data found for user");
+          return null;
+        }
+        
+        const quizId = quizData[0].id;
+        console.log("Found latest quiz ID:", quizId);
+        
+        // Get the quiz embedding
+        const { data: embeddingData, error: embeddingError } = await supabase
+          .from('quiz_embedding')
+          .select('embedding')
+          .eq('quiz_id', quizId)
+          .limit(1);
+        
+        if (embeddingError) {
+          console.error("Error fetching embedding:", embeddingError);
+          return null;
+        }
+        
+        if (!embeddingData || embeddingData.length === 0) {
+          console.log("No embedding found for quiz");
+          return null;
+        }
+        
+        console.log("Found user embedding");
+        return embeddingData[0].embedding;
+      } catch (err) {
+        console.error("Error in fetchUserQuizEmbedding:", err);
+        return null;
+      }
+    }
+    
+    async function initialize() {
+      const embedding = await fetchUserQuizEmbedding();
+      setUserEmbedding(embedding);
+      setIsPersonalized(!!embedding);
+    }
+    
+    initialize();
+  }, []);
+
+  // Fetch products and calculate similarity scores if user has an embedding
+  useEffect(() => {
+    async function fetchProductsWithSimilarity() {
       try {
         setLoading(true);
+        
+        // Fetch all products
         let query = supabase.from('products').select('*');
-
+        
         // Apply category filter if not "all"
         if (category !== 'all') {
           query = query.eq('category', category);
         }
-
+        
         // Apply search filter if there's a query
         if (searchQuery) {
           query = query.ilike('name', `%${searchQuery}%`);
         }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-        setProducts(data || []);
-        console.log("Fetched products:", data); // Debug log
+        
+        const { data: productsData, error: productsError } = await query;
+        
+        if (productsError) {
+          throw productsError;
+        }
+        
+        // If we have user embeddings, fetch product embeddings and calculate similarity
+        if (userEmbedding) {
+          // Fetch all product embeddings
+          const { data: embeddings, error: embeddingsError } = await supabase
+            .from('product_embeddings')
+            .select('product_id, embedding');
+          
+          if (embeddingsError) {
+            throw embeddingsError;
+          }
+          
+          // Create mapping of product_id to embedding
+          const embeddingMap = {};
+          embeddings.forEach(item => {
+            embeddingMap[item.product_id] = item.embedding;
+          });
+          
+          // Calculate similarity score for each product
+          const productsWithScore = productsData.map(product => {
+            const embedding = embeddingMap[product.id];
+            let similarityScore = 0;
+            
+            if (embedding) {
+              similarityScore = cosineSimilarity(embedding, userEmbedding);
+            }
+            
+            return { ...product, similarityScore };
+          });
+          
+          // Sort by similarity score (highest first)
+          productsWithScore.sort((a, b) => b.similarityScore - a.similarityScore);
+          
+          setPersonalizedProducts(productsWithScore);
+          
+          // If we're showing personalized results, use the sorted list
+          if (showingPersonalized) {
+            setProducts(productsWithScore);
+          } else {
+            setProducts(productsData || []);
+          }
+        } else {
+          // No user embedding, just use regular products
+          setProducts(productsData || []);
+        }
+        
+        console.log("Fetched products:", productsData?.length || 0);
       } catch (err) {
         console.error('Error fetching products:', err);
         setError('Failed to load products. Please try again.');
@@ -51,8 +203,8 @@ export default function ShopPage() {
       }
     }
 
-    fetchProducts();
-  }, [category, searchQuery]);
+    fetchProductsWithSimilarity();
+  }, [category, searchQuery, userEmbedding, showingPersonalized]);
 
   const handleCategoryChange = (newCategory) => {
     setCategory(newCategory);
@@ -61,6 +213,10 @@ export default function ShopPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     // Search is already triggered by the effect above
+  };
+
+  const togglePersonalization = () => {
+    setShowingPersonalized(!showingPersonalized);
   };
 
   return (
@@ -72,10 +228,28 @@ export default function ShopPage() {
       <div className="relative z-10 container mx-auto px-6 py-10">
         {/* Header */}
         <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">Beauty Shop</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Product Book</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Discover products curated just for you based on your beauty profile.
           </p>
+          
+          {/* Personalization toggle */}
+          {isPersonalized && (
+            <div className="mt-4">
+              <button
+                onClick={togglePersonalization}
+                className={`
+                  flex items-center gap-2 mx-auto px-4 py-2 rounded-full text-sm font-medium transition-all
+                  ${showingPersonalized 
+                    ? 'bg-rose-500 text-white shadow-md' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                `}
+              >
+                <Sparkles size={16} className={showingPersonalized ? "text-yellow-300" : "text-gray-500"} />
+                {showingPersonalized ? 'Showing Personalized Results' : 'Show Personalized Results'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search and filter section */}
@@ -178,6 +352,14 @@ export default function ShopPage() {
                   {product.discount_price && (
                     <div className="absolute top-3 left-3 px-3 py-1 bg-rose-500 text-white text-xs font-bold rounded-full">
                       Sale
+                    </div>
+                  )}
+                  
+                  {/* Match score indicator */}
+                  {showingPersonalized && product.similarityScore > 0 && (
+                    <div className="absolute bottom-3 left-3 px-3 py-1 bg-white/90 text-rose-500 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm">
+                      <Sparkles size={12} />
+                      {Math.round(product.similarityScore * 100)}% Match
                     </div>
                   )}
                 </div>

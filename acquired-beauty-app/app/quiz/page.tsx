@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase';
 
 const quizQuestions = [
   {
@@ -117,6 +119,35 @@ export default function QuizPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [completed, setCompleted] = useState(false);
     const [error, setError] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const router = useRouter();
+    
+    useEffect(() => {
+      // Get the current user's session when the component mounts
+      const fetchUser = async () => {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Error fetching session:', error);
+            return;
+          }
+          
+          if (session?.user) {
+            setUserId(session.user.id);
+          } else {
+            // Handle case where user is not logged in
+            console.log('No user session found');
+            // Optional: redirect to login
+            // router.push('/login');
+          }
+        } catch (err) {
+          console.error('Failed to fetch user:', err);
+        }
+      };
+      
+      fetchUser();
+    }, [router]);
     
     const handleAnswer = (optionId) => {
       const question = quizQuestions[currentQuestion];
@@ -165,9 +196,13 @@ export default function QuizPage() {
       }
     };
 
-// Replace your current handleSubmit function with this version
-
     const handleSubmit = async () => {
+      // Check if user ID is available
+      if (!userId) {
+        setError('User ID not available. Please make sure you are logged in.');
+        return;
+      }
+
       // For the last question if it's multi-select
       if (quizQuestions[currentQuestion].multiSelect) {
         setAnswers(prev => ({ ...prev, [quizQuestions[currentQuestion].id]: selectedOptions }));
@@ -183,10 +218,10 @@ export default function QuizPage() {
         // Map answer IDs to the question field names in the database
         const fieldMapping = {
           1: 'skin_tone',
-          2: 'undertone',
-          3: 'coverage',
+          2: 'under_tone',
+          3: 'coverage_level',
           4: 'skin_type',
-          5: 'skin_concerns',
+          5: 'restrictions',
           6: 'lip_product',
           7: 'eye_color',
           8: 'makeup_style',
@@ -214,6 +249,9 @@ export default function QuizPage() {
             formattedAnswers[field] = ''; // Provide default empty string for missing fields
           }
         }
+        
+        // Add the user_id to the formatted answers
+        formattedAnswers.user_id = userId;
         
         console.log("Submitting data:", formattedAnswers);
         
@@ -297,10 +335,10 @@ export default function QuizPage() {
             </p>
             
             <button
-              onClick={() => window.location.href = '/'}
+              onClick={() => router.push('/shop')}
               className="px-8 py-3 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-md hover:shadow-lg mx-auto"
             >
-              Back to Home
+              Start shopping
             </button>
           </div>
         </div>
@@ -361,6 +399,13 @@ export default function QuizPage() {
               ))}
             </div>
   
+            {/* Authentication warning */}
+            {!userId && (
+              <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 rounded-lg">
+                You are not logged in. Please log in to save your quiz results.
+              </div>
+            )}
+            
             {/* Navigation */}
             <div className="flex justify-between">
               <button
@@ -391,11 +436,11 @@ export default function QuizPage() {
               {currentQuestion === quizQuestions.length - 1 && (
                 <button
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !userId}
                   className={`
                     flex items-center gap-2 px-8 py-3 rounded-full bg-rose-500 text-white 
                     hover:bg-rose-600 transition-all shadow-md hover:shadow-lg
-                    ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}
+                    ${(isSubmitting || !userId) ? 'opacity-70 cursor-not-allowed' : ''}
                   `}
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit'}
