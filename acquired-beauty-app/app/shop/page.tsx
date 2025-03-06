@@ -26,7 +26,7 @@ export default function ShopPage() {
     async function fetchProducts() {
       try {
         setLoading(true);
-        let query = supabase.from('product').select('*');
+        let query = supabase.from('products').select('*');
 
         // Apply category filter if not "all"
         if (category !== 'all') {
