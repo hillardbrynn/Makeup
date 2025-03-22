@@ -5,7 +5,45 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import supabase from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
-import { Heart, ShoppingBag, Filter, Search, Star, Sparkles } from 'lucide-react';
+import { 
+  Heart, 
+  ShoppingBag, 
+  Filter, 
+  Search, 
+  Star, 
+  Sparkles,
+  User,
+  ShoppingCart,
+  Menu,
+  Users
+} from 'lucide-react';
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import Link from 'next/link';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
 
 export default function ShopPage() {
   const getProxiedImageUrl = (originalUrl) => {
@@ -225,6 +263,146 @@ export default function ShopPage() {
       <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-rose-100 rounded-bl-[40%] opacity-20 z-0" />
       <div className="absolute bottom-0 left-0 w-1/3 h-1/3 bg-pink-100 rounded-tr-[40%] opacity-20 z-0" />
 
+      {/* Navbar */}
+      <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-sm">
+        <div className="container mx-auto flex h-16 items-center justify-between px-6">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="h-6 w-6 text-rose-500" />
+            <span className="text-xl font-bold text-gray-900">acquired.beauty</span>
+          </div>
+
+          {/* Desktop Navigation Menu */}
+          <div className="hidden md:flex">
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <Link href="/" legacyBehavior passHref>
+                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                      Home
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link href="/shop" legacyBehavior passHref>
+                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                      Shop
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger>Categories</NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+                      {categories.slice(1).map((category) => (
+                        <li key={category} className="row-span-1">
+                          <NavigationMenuLink asChild>
+                            <a
+                              className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-rose-50 to-white p-6 no-underline outline-none focus:shadow-md"
+                              href={`/shop?category=${category}`}
+                            >
+                              <div className="mb-2 mt-4 text-lg font-medium capitalize text-rose-500">
+                                {category}
+                              </div>
+                              <p className="text-sm leading-tight text-gray-500">
+                                Shop our collection of {category} products
+                              </p>
+                            </a>
+                          </NavigationMenuLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link href="/quiz" legacyBehavior passHref>
+                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                      Beauty Quiz
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link href="/" legacyBehavior passHref>
+                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                      <Users />
+                      Community
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          </div>
+
+          {/* Right side icons */}
+          <div className="flex items-center gap-4">
+            {/* <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500"> */}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500"><User className="h-5 w-5" /></DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  <DropdownMenuItem>Billing</DropdownMenuItem>
+                  <DropdownMenuItem>Team</DropdownMenuItem>
+                  <DropdownMenuItem>Subscription</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+            {/* </Button> */}
+            <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
+              <Heart className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
+              <ShoppingCart className="h-5 w-5" />
+            </Button>
+            
+            {/* Mobile menu */}
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right">
+                  <SheetHeader>
+                    <SheetTitle>BeautyShop</SheetTitle>
+                    <SheetDescription>
+                      Find your perfect beauty products
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-4 py-4">
+                    <Button variant="ghost" className="justify-start" asChild>
+                      <Link href="/">Home</Link>
+                    </Button>
+                    <Button variant="ghost" className="justify-start" asChild>
+                      <Link href="/shop">Shop</Link>
+                    </Button>
+                    <Button variant="ghost" className="justify-start" asChild>
+                      <Link href="/quiz">Beauty Quiz</Link>
+                    </Button>
+                    <div className="py-2">
+                      <p className="text-sm font-medium text-gray-500 mb-2">Categories</p>
+                      {categories.slice(1).map((cat) => (
+                        <Button 
+                          key={cat} 
+                          variant="ghost" 
+                          className="justify-start capitalize w-full text-gray-700"
+                          asChild
+                        >
+                          <Link href={`/shop?category=${cat}`}>{cat}</Link>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div className="h-10 w-full items-center bg-gradient-to-r from-rose-500 to-rose-400 justify-between"></div>
       <div className="relative z-10 container mx-auto px-6 py-10">
         {/* Header */}
         <div className="mb-10 text-center">

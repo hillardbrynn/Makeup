@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import Image from "next/image";
 
+
 export default function Home() {
   const router = useRouter();
   
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-rose-50 to-neutral-50">
-      <SidebarTrigger />
+      {/* <SidebarTrigger /> */}
       
       {/* Hero Section */}
       <div className="relative h-screen">
@@ -21,7 +22,7 @@ export default function Home() {
           {/* Text Content */}
           <div className="md:w-1/2 z-10">
             <h1 className="font-bold text-5xl md:text-6xl lg:text-7xl mb-6 text-gray-900 leading-tight">
-              <span className="text-rose-600">Acquired</span> Beauty
+              <span className="text-rose-600">acquired</span>.beauty
             </h1>
             <h2 className="text-2xl md:text-3xl mb-6 text-gray-700 font-light italic">
               Discover your perfect match
@@ -56,24 +57,24 @@ export default function Home() {
               <div className="absolute -bottom-12 -right-8 w-48 h-48 rounded-full bg-rose-300 opacity-40 blur-md" />
               
               {/* Product Image Grid */}
-              <div className="relative grid grid-cols-2 gap-4 p-6 bg-white/90 backdrop-blur-sm rounded-lg shadow-xl border border-rose-100">
-                <div className="aspect-square relative rounded-md overflow-hidden shadow-md">
+              <div className="relative grid grid-cols-2 gap-4 p-6 bg-white/90 backdrop-blur-sm rounded-[15%] shadow-xl border border-rose-100">
+                <div className="aspect-square relative rounded-[15%] overflow-hidden shadow-md">
                   <div className="absolute inset-0 bg-gradient-to-br from-rose-300 to-purple-300" />
                 </div>
-                <div className="aspect-square relative rounded-md overflow-hidden shadow-md">
+                <div className="aspect-square relative rounded-[15%] overflow-hidden shadow-md">
                   <div className="absolute inset-0 bg-gradient-to-br from-amber-200 to-rose-200" />
                 </div>
-                <div className="aspect-square relative rounded-md overflow-hidden shadow-md">
+                <div className="aspect-square relative rounded-[15%] overflow-hidden shadow-md">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-200 to-purple-200" />
                 </div>
-                <div className="aspect-square relative rounded-md overflow-hidden shadow-md">
+                <div className="aspect-square relative rounded-[15%] overflow-hidden shadow-md">
                   <div className="absolute inset-0 bg-gradient-to-br from-emerald-200 to-teal-200" />
                 </div>
                 
                 {/* Center brand logo */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-white/80 backdrop-blur-sm p-4 rounded-full shadow-lg">
-                    <div className="text-rose-500 font-bold text-3xl">AB</div>
+                    <div className="text-rose-500 font-bold text-4xl">AB</div>
                   </div>
                 </div>
               </div>
