@@ -64,7 +64,7 @@ export default function RootLayout({
           localStorage.removeItem('returnUrl');
           router.push(returnUrl);
         } else {
-          router.push('/');
+          router.push('/shop');
         }
       }
     });
@@ -85,7 +85,7 @@ export default function RootLayout({
     
     // Handle auth routes (redirect to dashboard if already logged in)
     if (authRoutes.includes(pathname) && user) {
-      router.push('/');
+      router.push('/shop');
     }
   }, [pathname, user, loading, router]);
 

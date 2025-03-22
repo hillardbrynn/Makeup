@@ -26,6 +26,7 @@ export default function LoginPage() {
       });
 
       if (error) throw error;
+      router.push("/shop")
       // Successful login will be handled by the auth listener in layout.tsx
     } catch (error) {
       setError(error.message || 'Error logging in');
@@ -77,7 +78,12 @@ export default function LoginPage() {
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-                <Button onClick={() => {router.push("/forgot-password")}}  className="text-rose-500 hover:text-rose-600 font-medium bg-transparent" variant="ghost">
+                <Button 
+                  type="button" // This explicitly makes it NOT a submit button
+                  onClick={() => {router.push("/forgot-password")}}
+                  className="text-rose-500 hover:text-rose-600 font-medium bg-transparent" 
+                  variant="ghost"
+                >
                   Forgot password?
                 </Button>
               </div>
