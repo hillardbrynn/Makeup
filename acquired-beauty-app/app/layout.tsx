@@ -1,26 +1,24 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import supabase from '@/lib/supabase'; // Make sure to update the path
+import supabase from '@/lib/supabase';
 
 // Fonts
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
-
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
 // Define which routes require authentication
-const protectedRoutes = ['/dashboard', '/recommendations'];
+const protectedRoutes = ['/quiz', '/shop'];
+
 // Define public routes that should redirect if user is already logged in
 const authRoutes = ['/auth'];
 
@@ -58,13 +56,23 @@ export default function RootLayout({
         setTimeout(() => {
           router.replace('/auth');
         }, 100);
-      } else if (event === 'SIGNED_IN') {
-        const returnUrl = localStorage.getItem('returnUrl');
-        if (returnUrl) {
-          localStorage.removeItem('returnUrl');
-          router.push(returnUrl);
+      } else if (event === 'SIGNED_IN' || event === 'SIGNED_UP') {
+        // Check if this is a new user (just signed up)
+        const isNewSignUp = event === 'SIGNED_UP';
+        
+        if (isNewSignUp) {
+          // New user - redirect to quiz first
+          router.push('/quiz');
         } else {
-          router.push('/shop');
+          // Existing user - check for return URL
+          const returnUrl = localStorage.getItem('returnUrl');
+          if (returnUrl && !authRoutes.includes(returnUrl)) {
+            localStorage.removeItem('returnUrl');
+            router.push(returnUrl);
+          } else {
+            // No valid return URL, go to shop
+            router.push('/shop');
+          }
         }
       }
     });
@@ -83,7 +91,7 @@ export default function RootLayout({
       router.push('/auth');
     }
     
-    // Handle auth routes (redirect to dashboard if already logged in)
+    // Handle auth routes (redirect to shop if already logged in)
     if (authRoutes.includes(pathname) && user) {
       router.push('/shop');
     }
@@ -106,7 +114,6 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SidebarProvider defaultOpen={false}>
-          <AppSidebar />
           {children}
         </SidebarProvider>
       </body>

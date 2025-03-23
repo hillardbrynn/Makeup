@@ -37,20 +37,21 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: name,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         }
       });
 
       if (error) throw error;
       
-        // Successfully signed up, now redirect to quiz
+      // Successfully signed up, now redirect to OTP verification
       if (data && data.user) {
-        // Clear any stored return URL to prevent default dashboard routing
-        localStorage.removeItem('returnUrl');
-            
-        // Override the default auth listener behavior by immediately redirecting
-        router.push('/quiz');
-       }
+        // Store email in localStorage for use on the verification page
+        localStorage.setItem('verificationEmail', email);
+        
+        // Redirect to email verification page
+        router.push('/confirm-email');
+      }
     } catch (error) {
       setError(error.message || 'Error creating account');
     } finally {
