@@ -9,8 +9,8 @@ import argparse
 load_dotenv()
 
 # Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
+supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+supabase_key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 if not supabase_url or not supabase_key:
     raise ValueError("SUPABASE_URL or SUPABASE_KEY is missing from environment variables")
