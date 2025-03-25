@@ -286,7 +286,7 @@ export default function ShopPage() {
                 <NavigationMenuItem>
                   <Link href="/shop" legacyBehavior passHref>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Shop
+                      Products
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
@@ -324,8 +324,10 @@ export default function ShopPage() {
                 <NavigationMenuItem>
                   <Link href="/" legacyBehavior passHref>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      <Users />
-                      Community
+                      <span className="flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        <span>Community</span>
+                      </span>
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
@@ -343,9 +345,6 @@ export default function ShopPage() {
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>Profile</DropdownMenuItem>
-                  <DropdownMenuItem>Billing</DropdownMenuItem>
-                  <DropdownMenuItem>Team</DropdownMenuItem>
-                  <DropdownMenuItem>Subscription</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -353,9 +352,7 @@ export default function ShopPage() {
             <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
               <Heart className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
-              <ShoppingCart className="h-5 w-5" />
-            </Button>
+
             
             {/* Mobile menu */}
             <div className="md:hidden">
@@ -377,7 +374,7 @@ export default function ShopPage() {
                       <Link href="/">Home</Link>
                     </Button>
                     <Button variant="ghost" className="justify-start" asChild>
-                      <Link href="/shop">Shop</Link>
+                      <Link href="/shop">Products</Link>
                     </Button>
                     <Button variant="ghost" className="justify-start" asChild>
                       <Link href="/quiz">Beauty Quiz</Link>

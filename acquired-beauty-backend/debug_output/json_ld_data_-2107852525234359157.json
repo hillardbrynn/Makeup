@@ -1,0 +1,55 @@
+{
+  "@type": "ItemList",
+  "@context": "http://schema.org",
+  "itemListElement": [
+    {
+      "url": "https://www.sephora.com/shop/makeup-cosmetics",
+      "name": "Makeup",
+      "@type": "SiteNavigationElement",
+      "position": 1,
+      "description": "Shop the best makeup now at Sephora and earn points with every purchase! Not yet a Beauty Insider? Join now for FREE!"
+    },
+    {
+      "url": "https://www.sephora.com/shop/skincare ",
+      "name": "Skincare",
+      "@type": "SiteNavigationElement",
+      "position": 2,
+      "description": "Shop skincare products at Sephora. Find top-rated products from leading skincare brands to help target specific skin concerns and revitalize your look."
+    },
+    {
+      "url": "https://www.sephora.com/shop/hair-products",
+      "name": "Hair",
+      "@type": "SiteNavigationElement",
+      "position": 3,
+      "description": "Explore our top-rated hair care products at Sephora. Browse an unrivaled selection of shampoos, conditioners, styling products, hair color and more from top brands."
+    },
+    {
+      "url": "https://www.sephora.com/shop/fragrance",
+      "name": "Fragrance",
+      "@type": "SiteNavigationElement",
+      "position": 4,
+      "description": "Shop fragrances for women and men at Sephora. Find your favorite perfume or cologne or accentuate your style with a new scent."
+    },
+    {
+      "url": "https://www.sephora.com/shop/makeup-tools",
+      "name": "Tools & Brushes",
+      "@type": "SiteNavigationElement",
+      "position": 5,
+      "description": "Shop beauty tools and accessories at Sephora. Find top-rated makeup tools, brushes, applicators, spa tools and more from leading brands."
+    },
+    {
+      "url": "https://www.sephora.com/shop/bath-body",
+      "name": "Bath & Body",
+      "@type": "SiteNavigationElement",
+      "position": 6,
+      "description": "Shop bath & body products at Sephora. Find an unrivaled selection of the top moisturizers, cleansers, lotions, exfoliants, scrubs and more from top brands."
+    },
+    {
+      "url": "https://www.sephora.com/sale",
+      "name": "Sale",
+      "@type": "SiteNavigationElement",
+      "position": 7,
+      "description": "Makeup sales are always on at Sephora. Shop discounted makeup, skincare, fragrance and hair care products at Sephora today. Free shipping and samples available."
+    }
+  ]
+}
