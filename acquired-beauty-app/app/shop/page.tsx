@@ -59,6 +59,7 @@ export default function ShopPage() {
   const [isPersonalized, setIsPersonalized] = useState(false);
   const [personalizedProducts, setPersonalizedProducts] = useState([]);
   const [showingPersonalized, setShowingPersonalized] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const router = useRouter();
 
   // Categories for filter buttons
@@ -87,7 +88,7 @@ export default function ShopPage() {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  // Fetch user's quiz embedding
+  // Fetch user's quiz embedding and user information
   useEffect(() => {
     async function fetchUserQuizEmbedding() {
       try {
@@ -101,8 +102,12 @@ export default function ShopPage() {
         
         if (!session?.user) {
           console.log("No user logged in - skipping personalization");
+          setCurrentUser(null);
           return null;
         }
+        
+        // Set current user information
+        setCurrentUser(session.user);
         
         const userId = session.user.id;
         console.log("Fetching quiz embedding for user:", userId);
@@ -256,6 +261,36 @@ export default function ShopPage() {
   const togglePersonalization = () => {
     setShowingPersonalized(!showingPersonalized);
   };
+  
+  // Handle user logout
+  const handleLogout = async () => {
+    try {
+      // Simply call signOut and let the auth route handler take care of redirection
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Error signing out:", error);
+      } else {
+        // Clear local state immediately for a responsive UI feel
+        setCurrentUser(null);
+        setUserEmbedding(null);
+        setIsPersonalized(false);
+        setPersonalizedProducts([]);
+        setShowingPersonalized(false);
+        
+        // The redirection will be handled by the /auth route.js file
+        // No need to manually redirect here
+      }
+    } catch (err) {
+      console.error("Error in logout:", err);
+    }
+  };
+
+  // Fixed navigation handler - don't use router.push directly
+  const handleNavigation = (e, href) => {
+    // Don't add any custom navigation logic here
+    // Let Next.js Link component handle it naturally
+  };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-rose-50 to-neutral-50">
@@ -268,8 +303,21 @@ export default function ShopPage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-6">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <ShoppingBag className="h-6 w-6 text-rose-500" />
-            <span className="text-xl font-bold text-gray-900">acquired.beauty</span>
+            <div 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={async () => {
+                // Check if user is logged in via Supabase
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) {
+                  // Not logged in, navigate to home
+                  router.push('/');
+                }
+                // If logged in, do nothing (stay on current page)
+              }}
+            >
+              <ShoppingBag className="h-6 w-6 text-rose-500" />
+              <span className="text-xl font-bold text-gray-900">acquired.beauty</span>
+            </div>
           </div>
 
           {/* Desktop Navigation Menu */}
@@ -277,11 +325,21 @@ export default function ShopPage() {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <Link href="/" legacyBehavior passHref>
+                  {/* Home link with conditional navigation */}
+                  <span onClick={async (e) => {
+                    e.preventDefault();
+                    // Check if user is logged in via Supabase
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session?.user) {
+                      // Not logged in, navigate to home
+                      router.push('/');
+                    }
+                    // If logged in, do nothing (stay on current page)
+                  }}>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                       Home
                     </NavigationMenuLink>
-                  </Link>
+                  </span>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link href="/shop" legacyBehavior passHref>
@@ -296,19 +354,25 @@ export default function ShopPage() {
                     <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
                       {categories.slice(1).map((category) => (
                         <li key={category} className="row-span-1">
-                          <NavigationMenuLink asChild>
-                            <a
-                              className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-rose-50 to-white p-6 no-underline outline-none focus:shadow-md"
-                              href={`/shop?category=${category}`}
-                            >
-                              <div className="mb-2 mt-4 text-lg font-medium capitalize text-rose-500">
-                                {category}
-                              </div>
-                              <p className="text-sm leading-tight text-gray-500">
-                                Shop our collection of {category} products
-                              </p>
-                            </a>
-                          </NavigationMenuLink>
+                          <Link href={category === 'blush' ? `/shop?category=${category}` : '#'} passHref legacyBehavior>
+                            <NavigationMenuLink asChild>
+                              <a
+                                className={`flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-rose-50 to-white p-6 no-underline outline-none focus:shadow-md ${category !== 'blush' ? 'cursor-default' : ''}`}
+                              >
+                                <div className="mb-2 mt-4 text-lg font-medium capitalize text-rose-500">
+                                  {category}
+                                </div>
+                                <p className="text-sm leading-tight text-gray-500">
+                                  {category === 'blush' 
+                                    ? 'Shop our collection of blush products' 
+                                    : <span className="flex items-center">
+                                        <span className="text-rose-400 font-medium">Coming Soon</span>
+                                      </span>
+                                  }
+                                </p>
+                              </a>
+                            </NavigationMenuLink>
+                          </Link>
                         </li>
                       ))}
                     </ul>
@@ -322,7 +386,7 @@ export default function ShopPage() {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link href="/" legacyBehavior passHref>
+                  <Link href="/community" legacyBehavior passHref>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                       <span className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
@@ -337,28 +401,65 @@ export default function ShopPage() {
 
           {/* Right side icons */}
           <div className="flex items-center gap-4">
-            {/* <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500"> */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative text-gray-700 hover:text-rose-500">
+                  <User className="h-5 w-5" />
+                  {currentUser && (
+                    <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-green-500" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56">
+                {currentUser ? (
+                  <>
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">Logged in as</p>
+                        <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">My Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/orders">My Orders</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/quiz">Beauty Quiz</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-red-500 focus:text-red-500">
+                      Logout
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuLabel>Not logged in</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/login">Login</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/signup">Create Account</Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500"><User className="h-5 w-5" /></DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-            {/* </Button> */}
             <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
-              <Heart className="h-5 w-5" />
+              <Link href="/wishlist">
+                <Heart className="h-5 w-5" />
+              </Link>
             </Button>
 
-            
             {/* Mobile menu */}
             <div className="md:hidden">
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden">
+                  <Button variant="ghost" size="icon">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
@@ -370,26 +471,42 @@ export default function ShopPage() {
                     </SheetDescription>
                   </SheetHeader>
                   <div className="flex flex-col gap-4 py-4">
-                    <Button variant="ghost" className="justify-start" asChild>
-                      <Link href="/">Home</Link>
+                    <Button 
+                      variant="ghost" 
+                      className="justify-start w-full"
+                      onClick={async () => {
+                        // Check if user is logged in
+                        const { data: { session } } = await supabase.auth.getSession();
+                        if (!session?.user) {
+                          // Not logged in, navigate to home
+                          router.push('/');
+                        }
+                        // If logged in, do nothing (stay on current page)
+                      }}
+                    >
+                      Home
                     </Button>
-                    <Button variant="ghost" className="justify-start" asChild>
-                      <Link href="/shop">Products</Link>
-                    </Button>
-                    <Button variant="ghost" className="justify-start" asChild>
-                      <Link href="/quiz">Beauty Quiz</Link>
-                    </Button>
+                    <Link href="/shop" passHref>
+                      <Button variant="ghost" className="justify-start w-full">
+                        Products
+                      </Button>
+                    </Link>
+                    <Link href="/quiz" passHref>
+                      <Button variant="ghost" className="justify-start w-full">
+                        Beauty Quiz
+                      </Button>
+                    </Link>
                     <div className="py-2">
                       <p className="text-sm font-medium text-gray-500 mb-2">Categories</p>
                       {categories.slice(1).map((cat) => (
-                        <Button 
-                          key={cat} 
-                          variant="ghost" 
-                          className="justify-start capitalize w-full text-gray-700"
-                          asChild
-                        >
-                          <Link href={`/shop?category=${cat}`}>{cat}</Link>
-                        </Button>
+                        <Link key={cat} href={`/shop?category=${cat}`} passHref>
+                          <Button 
+                            variant="ghost" 
+                            className="justify-start capitalize w-full text-gray-700"
+                          >
+                            {cat}
+                          </Button>
+                        </Link>
                       ))}
                     </div>
                   </div>
@@ -491,88 +608,90 @@ export default function ShopPage() {
               <div 
                 key={product.id} 
                 className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => router.push(`/shop/product/${product.id}`)}
               >
-                {/* Product Image */}
-                <div className="relative h-56 bg-gray-100">
-                  {product.image_url ? (
-                    <img 
-                    src={getProxiedImageUrl(product.image_url)} 
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                        console.error(`Error loading image for ${product.name}:`, e);
-                        e.target.src = "/placeholder-product.png";
-                        e.target.onerror = null;
-                    }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <ShoppingBag size={40} className="text-gray-300" />
-                    </div>
-                  )}
-                  
-                  {/* Wishlist button */}
-                  <button 
-                    className="absolute top-3 right-3 p-2 rounded-full bg-white/80 hover:bg-white shadow-sm hover:shadow transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering the parent onClick
-                      // Add wishlist functionality here
-                    }}
-                  >
-                    <Heart size={18} className="text-gray-500 hover:text-rose-500" />
-                  </button>
-
-                  {/* Sale tag if discounted */}
-                  {product.discount_price && (
-                    <div className="absolute top-3 left-3 px-3 py-1 bg-rose-500 text-white text-xs font-bold rounded-full">
-                      Sale
-                    </div>
-                  )}
-                  
-                  {/* Match score indicator */}
-                  {showingPersonalized && product.similarityScore > 0 && (
-                    <div className="absolute bottom-3 left-3 px-3 py-1 bg-white/90 text-rose-500 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm">
-                      <Sparkles size={12} />
-                      {Math.round(product.similarityScore * 100)}% Match
-                    </div>
-                  )}
-                </div>
-
-                {/* Product details */}
-                <div className="p-4">
-                  {/* Brand */}
-                  <p className="text-xs text-gray-500 mb-1 uppercase">{product.brand}</p>
-                  
-                  {/* Name */}
-                  <h3 className="font-medium text-gray-900 mb-1 truncate">{product.name}</h3>
-                  
-                  {/* Rating */}
-                  <div className="flex items-center mb-2">
-                    <div className="flex items-center">
-                      {[...Array(5)].map((_, i) => (
-                        <Star 
-                          key={i} 
-                          size={14} 
-                          className={i < Math.round(product.rating || 0) ? "text-amber-400 fill-amber-400" : "text-gray-300"} 
-                        />
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-500 ml-1">({product.reviews || 0})</span>
-                  </div>
-                  
-                  {/* Price */}
-                  <div className="flex items-center">
-                    {product.discount_price ? (
-                      <>
-                        <span className="font-bold text-rose-500">${product.discount_price}</span>
-                        <span className="text-gray-400 text-sm line-through ml-2">${product.price}</span>
-                      </>
+                <Link href={`/shop/product/${product.id}`} passHref>
+                  {/* Product Image */}
+                  <div className="relative h-56 bg-gray-100">
+                    {product.image_url ? (
+                      <img 
+                      src={getProxiedImageUrl(product.image_url)} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                          console.error(`Error loading image for ${product.name}:`, e);
+                          e.target.src = "/placeholder-product.png";
+                          e.target.onerror = null;
+                      }}
+                      />
                     ) : (
-                      <span className="font-bold text-gray-900">${product.price}</span>
+                      <div className="flex items-center justify-center h-full">
+                        <ShoppingBag size={40} className="text-gray-300" />
+                      </div>
+                    )}
+                    
+                    {/* Wishlist button */}
+                    <button 
+                      className="absolute top-3 right-3 p-2 rounded-full bg-white/80 hover:bg-white shadow-sm hover:shadow transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering the parent onClick
+                        e.preventDefault(); // Prevent navigation
+                        // Add wishlist functionality here
+                      }}
+                    >
+                      <Heart size={18} className="text-gray-500 hover:text-rose-500" />
+                    </button>
+
+                    {/* Sale tag if discounted */}
+                    {product.discount_price && (
+                      <div className="absolute top-3 left-3 px-3 py-1 bg-rose-500 text-white text-xs font-bold rounded-full">
+                        Sale
+                      </div>
+                    )}
+                    
+                    {/* Match score indicator */}
+                    {showingPersonalized && product.similarityScore > 0 && (
+                      <div className="absolute bottom-3 left-3 px-3 py-1 bg-white/90 text-rose-500 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm">
+                        <Sparkles size={12} />
+                        {Math.round(product.similarityScore * 100)}% Match
+                      </div>
                     )}
                   </div>
-                </div>
+
+                  {/* Product details */}
+                  <div className="p-4">
+                    {/* Brand */}
+                    <p className="text-xs text-gray-500 mb-1 uppercase">{product.brand}</p>
+                    
+                    {/* Name */}
+                    <h3 className="font-medium text-gray-900 mb-1 truncate">{product.name}</h3>
+                    
+                    {/* Rating */}
+                    <div className="flex items-center mb-2">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <Star 
+                            key={i} 
+                            size={14} 
+                            className={i < Math.round(product.rating || 0) ? "text-amber-400 fill-amber-400" : "text-gray-300"} 
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-gray-500 ml-1">({product.reviews || 0})</span>
+                    </div>
+                    
+                    {/* Price */}
+                    <div className="flex items-center">
+                      {product.discount_price ? (
+                        <>
+                          <span className="font-bold text-rose-500">${product.discount_price}</span>
+                          <span className="text-gray-400 text-sm line-through ml-2">${product.price}</span>
+                        </>
+                      ) : (
+                        <span className="font-bold text-gray-900">${product.price}</span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
               </div>
             ))}
           </div>
