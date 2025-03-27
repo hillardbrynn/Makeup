@@ -12,18 +12,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # Frontend Deployment
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'  # Using a more recent Node.js version
+          node-version: '18'
 
-      - name: Install dependencies
+      - name: Install Frontend Dependencies
+        working-directory: ./acquired-beauty-app
         run: npm install
 
-      - name: Build project
-        run: npm run dev  # Use build command for production builds
+      - name: Build Frontend
+        working-directory: ./acquired-beauty-app
+        run: npm run dev
 
-      - name: Deploy to Vercel
+      - name: Deploy Frontend to Vercel
+        working-directory: ./acquired-beauty-app
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}  # Pulls Vercel token from GitHub secrets
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: npx vercel --prod --token $VERCEL_TOKEN
+
+      # Backend Deployment
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Backend Dependencies
+        working-directory: ./acquired-beauty-backend
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Deploy Backend
+        working-directory: ./acquired-beauty-backend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # Create vercel.json if it doesn't exist
+          if [ ! -f vercel.json ]; then
+            echo '{
+              "version": 2,
+              "builds": [
+                { "src": "server.py", "use": "@vercel/python" }
+              ],
+              "routes": [
+                { "src": "/(.*)", "dest": "server.py" }
+              ]
+            }' > vercel.json
+          fi
+          npx vercel --prod --token $VERCEL_TOKEN
