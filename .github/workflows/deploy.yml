@@ -1,0 +1,29 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - main  # Triggers deployment when code is pushed to the 'main' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'  # Using a more recent Node.js version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run dev  # Use build command for production builds
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}  # Pulls Vercel token from GitHub secrets
+        run: npx vercel --prod --token $VERCEL_TOKEN
