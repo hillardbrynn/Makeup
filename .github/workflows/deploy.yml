@@ -31,34 +31,3 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: npx vercel --prod --token $VERCEL_TOKEN
-
-      # Backend Deployment
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install Backend Dependencies
-        working-directory: ./acquired-beauty-backend
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Deploy Backend
-        working-directory: ./acquired-beauty-backend
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          # Create vercel.json if it doesn't exist
-          if [ ! -f vercel.json ]; then
-            echo '{
-              "version": 2,
-              "builds": [
-                { "src": "server.py", "use": "@vercel/python" }
-              ],
-              "routes": [
-                { "src": "/(.*)", "dest": "server.py" }
-              ]
-            }' > vercel.json
-          fi
-          npx vercel --prod --token $VERCEL_TOKEN
