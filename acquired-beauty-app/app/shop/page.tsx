@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import supabase from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { 
@@ -13,7 +12,6 @@ import {
   Star, 
   Sparkles,
   User,
-  ShoppingCart,
   Menu,
   Users
 } from 'lucide-react';
@@ -42,31 +40,55 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
+// Define TypeScript interfaces
+interface ProductType {
+  id: number;
+  name: string;
+  price: number;
+  discount_price?: number;
+  brand: string;
+  image_url?: string;
+  rating?: number;
+  reviews?: number;
+  category?: string;
+  similarityScore?: number;
+}
+
+interface UserType {
+  id: string;
+  email?: string;
+}
+
+interface ProductEmbedding {
+  product_id: number;
+  embedding: number[];
+}
 
 export default function ShopPage() {
-  const getProxiedImageUrl = (originalUrl) => {
+  const getProxiedImageUrl = (originalUrl?: string): string => {
+    if (!originalUrl) return "/placeholder-product.png";
     return `/api/image?url=${encodeURIComponent(originalUrl)}`;
   };
   
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [category, setCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [userEmbedding, setUserEmbedding] = useState(null);
-  const [isPersonalized, setIsPersonalized] = useState(false);
-  const [personalizedProducts, setPersonalizedProducts] = useState([]);
-  const [showingPersonalized, setShowingPersonalized] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [products, setProducts] = useState<ProductType[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [userEmbedding, setUserEmbedding] = useState<number[] | null>(null);
+  const [isPersonalized, setIsPersonalized] = useState<boolean>(false);
+  const [, setPersonalizedProducts] = useState<ProductType[]>([]);
+  const [showingPersonalized, setShowingPersonalized] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const router = useRouter();
 
   // Categories for filter buttons
   const categories = ['all', 'foundation', 'concealer', 'blush', 'eyeshadow', 'mascara', 'lipstick'];
 
   // Cosine similarity function to measure product match
-  function cosineSimilarity(vecA, vecB) {
+  function cosineSimilarity(vecA: number[], vecB: number[]): number {
     if (!vecA || !vecB || vecA.length !== vecB.length) {
       return 0;
     }
@@ -107,7 +129,10 @@ export default function ShopPage() {
         }
         
         // Set current user information
-        setCurrentUser(session.user);
+        setCurrentUser({
+          id: session.user.id,
+          email: session.user.email
+        });
         
         const userId = session.user.id;
         console.log("Fetching quiz embedding for user:", userId);
@@ -192,6 +217,8 @@ export default function ShopPage() {
           throw productsError;
         }
         
+        const typedProductsData = productsData as ProductType[] || [];
+        
         // If we have user embeddings, fetch product embeddings and calculate similarity
         if (userEmbedding) {
           // Fetch all product embeddings
@@ -204,17 +231,17 @@ export default function ShopPage() {
           }
           
           // Create mapping of product_id to embedding
-          const embeddingMap = {};
-          embeddings.forEach(item => {
+          const embeddingMap: Record<number, number[]> = {};
+          (embeddings as ProductEmbedding[]).forEach(item => {
             embeddingMap[item.product_id] = item.embedding;
           });
           
           // Calculate similarity score for each product
-          const productsWithScore = productsData.map(product => {
+          const productsWithScore = typedProductsData.map(product => {
             const embedding = embeddingMap[product.id];
             let similarityScore = 0;
             
-            if (embedding) {
+            if (embedding && userEmbedding) {
               similarityScore = cosineSimilarity(embedding, userEmbedding);
             }
             
@@ -222,7 +249,7 @@ export default function ShopPage() {
           });
           
           // Sort by similarity score (highest first)
-          productsWithScore.sort((a, b) => b.similarityScore - a.similarityScore);
+          productsWithScore.sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
           
           setPersonalizedProducts(productsWithScore);
           
@@ -230,14 +257,14 @@ export default function ShopPage() {
           if (showingPersonalized) {
             setProducts(productsWithScore);
           } else {
-            setProducts(productsData || []);
+            setProducts(typedProductsData);
           }
         } else {
           // No user embedding, just use regular products
-          setProducts(productsData || []);
+          setProducts(typedProductsData);
         }
         
-        console.log("Fetched products:", productsData?.length || 0);
+        console.log("Fetched products:", typedProductsData.length);
       } catch (err) {
         console.error('Error fetching products:', err);
         setError('Failed to load products. Please try again.');
@@ -249,21 +276,21 @@ export default function ShopPage() {
     fetchProductsWithSimilarity();
   }, [category, searchQuery, userEmbedding, showingPersonalized]);
 
-  const handleCategoryChange = (newCategory) => {
+  const handleCategoryChange = (newCategory: string): void => {
     setCategory(newCategory);
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: React.FormEvent): void => {
     e.preventDefault();
     // Search is already triggered by the effect above
   };
 
-  const togglePersonalization = () => {
+  const togglePersonalization = (): void => {
     setShowingPersonalized(!showingPersonalized);
   };
   
   // Handle user logout
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     try {
       // Simply call signOut and let the auth route handler take care of redirection
       const { error } = await supabase.auth.signOut();
@@ -279,17 +306,10 @@ export default function ShopPage() {
         setShowingPersonalized(false);
         
         // The redirection will be handled by the /auth route.js file
-        // No need to manually redirect here
       }
     } catch (err) {
       console.error("Error in logout:", err);
     }
-  };
-
-  // Fixed navigation handler - don't use router.push directly
-  const handleNavigation = (e, href) => {
-    // Don't add any custom navigation logic here
-    // Let Next.js Link component handle it naturally
   };
 
   return (
@@ -352,18 +372,18 @@ export default function ShopPage() {
                   <NavigationMenuTrigger>Categories</NavigationMenuTrigger>
                   <NavigationMenuContent>
                     <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                      {categories.slice(1).map((category) => (
-                        <li key={category} className="row-span-1">
-                          <Link href={category === 'blush' ? `/shop?category=${category}` : '#'} passHref legacyBehavior>
+                      {categories.slice(1).map((cat) => (
+                        <li key={cat} className="row-span-1">
+                          <Link href={cat === 'blush' ? `/shop?category=${cat}` : '#'} passHref legacyBehavior>
                             <NavigationMenuLink asChild>
                               <a
-                                className={`flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-rose-50 to-white p-6 no-underline outline-none focus:shadow-md ${category !== 'blush' ? 'cursor-default' : ''}`}
+                                className={`flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-rose-50 to-white p-6 no-underline outline-none focus:shadow-md ${cat !== 'blush' ? 'cursor-default' : ''}`}
                               >
                                 <div className="mb-2 mt-4 text-lg font-medium capitalize text-rose-500">
-                                  {category}
+                                  {cat}
                                 </div>
                                 <p className="text-sm leading-tight text-gray-500">
-                                  {category === 'blush' 
+                                  {cat === 'blush' 
                                     ? 'Shop our collection of blush products' 
                                     : <span className="flex items-center">
                                         <span className="text-rose-400 font-medium">Coming Soon</span>
@@ -613,16 +633,19 @@ export default function ShopPage() {
                   {/* Product Image */}
                   <div className="relative h-56 bg-gray-100">
                     {product.image_url ? (
-                      <img 
-                      src={getProxiedImageUrl(product.image_url)} 
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                          console.error(`Error loading image for ${product.name}:`, e);
-                          e.target.src = "/placeholder-product.png";
-                          e.target.onerror = null;
-                      }}
-                      />
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={getProxiedImageUrl(product.image_url)} 
+                          alt={product.name || "Product"}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            console.error(`Error loading image for ${product.name}:`, e);
+                            target.src = "/placeholder-product.png";
+                            target.onerror = null;
+                          }}
+                        />
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center h-full">
                         <ShoppingBag size={40} className="text-gray-300" />
@@ -649,7 +672,7 @@ export default function ShopPage() {
                     )}
                     
                     {/* Match score indicator */}
-                    {showingPersonalized && product.similarityScore > 0 && (
+                    {showingPersonalized && product.similarityScore && product.similarityScore > 0 && (
                       <div className="absolute bottom-3 left-3 px-3 py-1 bg-white/90 text-rose-500 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm">
                         <Sparkles size={12} />
                         {Math.round(product.similarityScore * 100)}% Match
