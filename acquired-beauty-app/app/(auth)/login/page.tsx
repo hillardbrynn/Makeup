@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -28,8 +28,9 @@ export default function LoginPage() {
       if (error) throw error;
       router.push("/shop")
       // Successful login will be handled by the auth listener in layout.tsx
-    } catch (error) {
-      setError(error.message || 'Error logging in');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      setError(err.message || 'Error logging in');
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,7 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-300 focus:border-rose-500 transition-all"
@@ -91,7 +92,7 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-300 focus:border-rose-500 transition-all"
@@ -144,7 +145,7 @@ export default function LoginPage() {
           
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Button onClick={() => {router.push("/signup")}} className="text-rose-500 hover:text-rose-600 font-medium bg-transparent" variant="ghost">
                 Sign up
               </Button>

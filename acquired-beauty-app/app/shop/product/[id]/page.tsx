@@ -15,15 +15,43 @@ import {
   Check 
 } from 'lucide-react';
 
-export default function ProductPage({ params }) {
+// Define type for the product
+interface ProductShade {
+  name: string;
+  color?: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  description: string;
+  price: number;
+  discount_price?: number;
+  category?: string;
+  image_url?: string;
+  additional_images?: string[];
+  rating?: number;
+  reviews?: number;
+  shades?: ProductShade[];
+  product_details?: string[];
+}
+
+// Make sure this type matches Next.js expectations
+type Props = {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+
+export default function ProductPage({ params }: Props) {
   const { id } = params;
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [selectedShade, setSelectedShade] = useState(null);
-  const [addedToCart, setAddedToCart] = useState(false);
-  const [addedToWishlist, setAddedToWishlist] = useState(false);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [selectedShade, setSelectedShade] = useState<ProductShade | null>(null);
+  const [addedToCart, setAddedToCart] = useState<boolean>(false);
+  const [addedToWishlist, setAddedToWishlist] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -38,13 +66,14 @@ export default function ProductPage({ params }) {
 
         if (error) throw error;
         
-        setProduct(data);
+        setProduct(data as Product);
         
         // If product has shades, select the first one by default
         if (data && data.shades && data.shades.length > 0) {
           setSelectedShade(data.shades[0]);
         }
-      } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (err: any) {
         console.error('Error fetching product:', err);
         setError('Failed to load the product. Please try again.');
       } finally {
@@ -126,7 +155,7 @@ export default function ProductPage({ params }) {
                 </div>
                 
                 {/* Thumbnails - if you have multiple images */}
-                {product.additional_images && (
+                {product.additional_images && product.additional_images.length > 0 && (
                   <div className="grid grid-cols-4 gap-2 mt-4">
                     {product.additional_images.map((img, index) => (
                       <div 
@@ -162,7 +191,7 @@ export default function ProductPage({ params }) {
                       />
                     ))}
                   </div>
-                  <span className="text-sm text-gray-500 ml-2">{product.rating} ({product.reviews || 0} reviews)</span>
+                  <span className="text-sm text-gray-500 ml-2">{product.rating || 0} ({product.reviews || 0} reviews)</span>
                 </div>
                 
                 {/* Price */}
@@ -282,17 +311,18 @@ export default function ProductPage({ params }) {
                 <div className="border-t border-gray-200 pt-6">
                   <h3 className="text-sm font-medium text-gray-900 mb-4">Details</h3>
                   <ul className="text-sm text-gray-600 space-y-2">
-                    {product.product_details && product.product_details.map((detail, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>{detail}</span>
-                      </li>
-                    ))}
-                    {!product.product_details && (
+                    {product.product_details && product.product_details.length > 0 ? (
+                      product.product_details.map((detail, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>{detail}</span>
+                        </li>
+                      ))
+                    ) : (
                       <>
                         <li className="flex items-start">
                           <span className="mr-2">•</span>
-                          <span>Category: {product.category}</span>
+                          <span>Category: {product.category || 'General'}</span>
                         </li>
                         <li className="flex items-start">
                           <span className="mr-2">•</span>

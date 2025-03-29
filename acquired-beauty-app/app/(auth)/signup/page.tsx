@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -17,7 +16,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleSignup = async (e) => {
+  const handleSignup = async (e: { preventDefault: () => void; }) => {
     e.preventDefault();
     setError('');
 
@@ -51,7 +50,8 @@ export default function SignupPage() {
         // Override the default auth listener behavior by immediately redirecting
         router.push('/quiz');
        }
-    } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
       setError(error.message || 'Error creating account');
     } finally {
       setLoading(false);

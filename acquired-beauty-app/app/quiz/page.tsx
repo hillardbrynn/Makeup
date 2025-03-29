@@ -1,12 +1,31 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 
-const quizQuestions = [
+// Define proper types for our quiz data
+type QuizOption = {
+  id: string;
+  label: string;
+  description: string;
+};
+
+type QuizQuestion = {
+  id: number;
+  question: string;
+  subtext: string;
+  multiSelect?: boolean;
+  options: QuizOption[];
+};
+
+// Define type for answers
+type Answers = {
+  [key: number]: string | string[];
+};
+
+const quizQuestions: QuizQuestion[] = [
   {
     id: 1,
     question: "Hey there! First things first—how would you describe your skin tone?",
@@ -112,14 +131,41 @@ const quizQuestions = [
   }
 ];
 
+// Interface for formatted answers to be sent to the API
+interface FormattedAnswers {
+  user_id: string;
+  skin_tone: string;
+  under_tone: string;
+  coverage_level: string;
+  skin_type: string;
+  restrictions: string;
+  lip_product: string;
+  eye_color: string;
+  makeup_style: string;
+  makeup_frequency: string;
+  [key: string]: string;
+}
+
+// Interface for validation error details
+interface ValidationErrorDetail {
+  loc: string[];
+  msg: string;
+  type: string;
+}
+
+// Interface for error response
+interface ErrorResponse {
+  detail: ValidationErrorDetail[] | string;
+}
+
 export default function QuizPage() {
-    const [currentQuestion, setCurrentQuestion] = useState(0);
-    const [answers, setAnswers] = useState({});
-    const [selectedOptions, setSelectedOptions] = useState([]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [completed, setCompleted] = useState(false);
-    const [error, setError] = useState(null);
-    const [userId, setUserId] = useState(null);
+    const [currentQuestion, setCurrentQuestion] = useState<number>(0);
+    const [answers, setAnswers] = useState<Answers>({});
+    const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [completed, setCompleted] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
     const router = useRouter();
     
     useEffect(() => {
@@ -149,7 +195,7 @@ export default function QuizPage() {
       fetchUser();
     }, [router]);
     
-    const handleAnswer = (optionId) => {
+    const handleAnswer = (optionId: string) => {
       const question = quizQuestions[currentQuestion];
       
       if (question.multiSelect) {
@@ -175,7 +221,7 @@ export default function QuizPage() {
   
     const handleNext = () => {
       if (quizQuestions[currentQuestion].multiSelect) {
-        setAnswers(prev => ({ ...prev, [quizQuestions[currentQuestion].id]: selectedOptions }));
+        setAnswers(prev => ({ ...prev, [quizQuestions[currentQuestion].id]: [...selectedOptions] }));
         if (currentQuestion < quizQuestions.length - 1) {
           setCurrentQuestion(prev => prev + 1);
           setSelectedOptions([]);
@@ -189,7 +235,12 @@ export default function QuizPage() {
         // For better UX, when going back to a multi-select question, restore previous selections
         const prevQuestion = quizQuestions[currentQuestion - 1];
         if (prevQuestion.multiSelect && answers[prevQuestion.id]) {
-          setSelectedOptions(answers[prevQuestion.id]);
+          const prevAnswers = answers[prevQuestion.id];
+          if (Array.isArray(prevAnswers)) {
+            setSelectedOptions(prevAnswers);
+          } else {
+            setSelectedOptions([]);
+          }
         } else {
           setSelectedOptions([]);
         }
@@ -205,7 +256,7 @@ export default function QuizPage() {
 
       // For the last question if it's multi-select
       if (quizQuestions[currentQuestion].multiSelect) {
-        setAnswers(prev => ({ ...prev, [quizQuestions[currentQuestion].id]: selectedOptions }));
+        setAnswers(prev => ({ ...prev, [quizQuestions[currentQuestion].id]: [...selectedOptions] }));
       }
 
       setIsSubmitting(true);
@@ -213,10 +264,21 @@ export default function QuizPage() {
       
       try {
         // Format the answers into a structure that matches your FastAPI model
-        const formattedAnswers = {};
+        const formattedAnswers: FormattedAnswers = {
+          user_id: userId,
+          skin_tone: '',
+          under_tone: '',
+          coverage_level: '',
+          skin_type: '',
+          restrictions: '',
+          lip_product: '',
+          eye_color: '',
+          makeup_style: '',
+          makeup_frequency: ''
+        };
         
         // Map answer IDs to the question field names in the database
-        const fieldMapping = {
+        const fieldMapping: { [key: number]: keyof FormattedAnswers } = {
           1: 'skin_tone',
           2: 'under_tone',
           3: 'coverage_level',
@@ -229,7 +291,8 @@ export default function QuizPage() {
         };
         
         // Format answers for API request
-        Object.entries(answers).forEach(([questionId, answer]) => {
+        Object.entries(answers).forEach(([questionIdStr, answer]) => {
+          const questionId = parseInt(questionIdStr, 10);
           const fieldName = fieldMapping[questionId];
           if (fieldName) {
             formattedAnswers[fieldName] = Array.isArray(answer) ? answer.join(',') : answer;
@@ -239,19 +302,10 @@ export default function QuizPage() {
         // Add the final question's answer if it's multi-select
         if (quizQuestions[currentQuestion].multiSelect) {
           const fieldName = fieldMapping[quizQuestions[currentQuestion].id];
-          formattedAnswers[fieldName] = selectedOptions.join(',');
-        }
-        
-        // Ensure all required fields are present
-        const requiredFields = Object.values(fieldMapping);
-        for (const field of requiredFields) {
-          if (!formattedAnswers[field]) {
-            formattedAnswers[field] = ''; // Provide default empty string for missing fields
+          if (fieldName) {
+            formattedAnswers[fieldName] = selectedOptions.join(',');
           }
         }
-        
-        // Add the user_id to the formatted answers
-        formattedAnswers.user_id = userId;
         
         console.log("Submitting data:", formattedAnswers);
         
@@ -266,13 +320,13 @@ export default function QuizPage() {
         
         // Handle different status codes
         if (response.status === 422) {
-          const validationErrors = await response.json();
+          const validationErrors = await response.json() as ErrorResponse;
           console.error("Validation errors:", validationErrors);
           
           // Format validation errors for display
           let errorMessage = "Validation error: ";
           if (validationErrors.detail && Array.isArray(validationErrors.detail)) {
-            errorMessage += validationErrors.detail.map(err => {
+            errorMessage += validationErrors.detail.map((err) => {
               if (err.loc && err.loc.length > 1) {
                 return `Field '${err.loc[1]}': ${err.msg}`;
               }
@@ -287,13 +341,16 @@ export default function QuizPage() {
           let errorMessage = `Failed to submit quiz results: ${response.status}`;
           
           try {
-            const errorData = await response.json();
+            const errorData = await response.json() as ErrorResponse;
             console.error("Error details:", errorData);
             
             if (errorData.detail) {
-              errorMessage = errorData.detail;
+              errorMessage = typeof errorData.detail === 'string' 
+                ? errorData.detail 
+                : JSON.stringify(errorData.detail);
             }
-          } catch (parseErr) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          } catch (_) { // Changed from 'error' to '_' to indicate it's intentionally unused
             // If not JSON, get text
             const errorText = await response.text();
             console.error("Error response:", errorText);
@@ -311,7 +368,11 @@ export default function QuizPage() {
         // router.push('/quiz/results');
       } catch (err) {
         console.error('Error submitting quiz:', err);
-        setError(err.message || 'Failed to submit quiz results');
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('Failed to submit quiz results');
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -331,7 +392,7 @@ export default function QuizPage() {
             
             <h2 className="text-3xl font-bold mb-4 text-gray-900">Thank You! 🎉</h2>
             <p className="text-lg text-gray-700 mb-6">
-              We've received your quiz answers and are generating personalized recommendations for you!
+              We&apos;ve received your quiz answers and are generating personalized recommendations for you!
             </p>
             
             <button
