@@ -7,6 +7,7 @@ import "./globals.css";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import supabase from '@/lib/supabase'; // Make sure to update the path
+import { User } from '@supabase/supabase-js'; // Import the User type
 
 // Fonts
 const geistSans = Geist({
@@ -29,7 +30,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -46,13 +47,13 @@ export default function RootLayout({
         setLoading(false);
       }
     };
-    
+
     getUser();
 
     // Set up auth state listener
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user || null);
-      
+
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setTimeout(() => {
@@ -76,13 +77,13 @@ export default function RootLayout({
 
   useEffect(() => {
     if (loading) return;
-    
+
     // Handle protected routes
     if (protectedRoutes.includes(pathname) && !user) {
       localStorage.setItem('returnUrl', pathname);
       router.push('/auth');
     }
-    
+
     // Handle auth routes (redirect to dashboard if already logged in)
     if (authRoutes.includes(pathname) && user) {
       router.push('/shop');
