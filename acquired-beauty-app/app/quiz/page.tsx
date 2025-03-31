@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
 
 // Define proper types for our quiz data
 type QuizOption = {
@@ -133,7 +132,6 @@ const quizQuestions: QuizQuestion[] = [
 
 // Interface for formatted answers to be sent to the API
 interface FormattedAnswers {
-  user_id: string;
   skin_tone: string;
   under_tone: string;
   coverage_level: string;
@@ -146,18 +144,6 @@ interface FormattedAnswers {
   [key: string]: string;
 }
 
-// Interface for validation error details
-interface ValidationErrorDetail {
-  loc: string[];
-  msg: string;
-  type: string;
-}
-
-// Interface for error response
-interface ErrorResponse {
-  detail: ValidationErrorDetail[] | string;
-}
-
 export default function QuizPage() {
     const [currentQuestion, setCurrentQuestion] = useState<number>(0);
     const [answers, setAnswers] = useState<Answers>({});
@@ -165,35 +151,9 @@ export default function QuizPage() {
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [completed, setCompleted] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [userId, setUserId] = useState<string | null>(null);
+    const [isRedirecting, setIsRedirecting] = useState<boolean>(false);
+    const [debugInfo, setDebugInfo] = useState<string>('');
     const router = useRouter();
-    
-    useEffect(() => {
-      // Get the current user's session when the component mounts
-      const fetchUser = async () => {
-        try {
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error('Error fetching session:', error);
-            return;
-          }
-          
-          if (session?.user) {
-            setUserId(session.user.id);
-          } else {
-            // Handle case where user is not logged in
-            console.log('No user session found');
-            // Optional: redirect to login
-            // router.push('/login');
-          }
-        } catch (err) {
-          console.error('Failed to fetch user:', err);
-        }
-      };
-      
-      fetchUser();
-    }, [router]);
     
     const handleAnswer = (optionId: string) => {
       const question = quizQuestions[currentQuestion];
@@ -248,12 +208,6 @@ export default function QuizPage() {
     };
 
     const handleSubmit = async () => {
-      // Check if user ID is available
-      if (!userId) {
-        setError('User ID not available. Please make sure you are logged in.');
-        return;
-      }
-
       // For the last question if it's multi-select
       if (quizQuestions[currentQuestion].multiSelect) {
         setAnswers(prev => ({ ...prev, [quizQuestions[currentQuestion].id]: [...selectedOptions] }));
@@ -261,11 +215,11 @@ export default function QuizPage() {
 
       setIsSubmitting(true);
       setError(null);
+      setDebugInfo('');
       
       try {
         // Format the answers into a structure that matches your FastAPI model
         const formattedAnswers: FormattedAnswers = {
-          user_id: userId,
           skin_tone: '',
           under_tone: '',
           coverage_level: '',
@@ -307,10 +261,15 @@ export default function QuizPage() {
           }
         }
         
-        console.log("Submitting data:", formattedAnswers);
+        console.log("Generating embedding for:", formattedAnswers);
+        setDebugInfo(prev => prev + `\nGenerating embedding for quiz answers: ${JSON.stringify(formattedAnswers)}`);
         
-        // Send to backend
-        const response = await fetch('http://localhost:8000/store-results', {
+        // Send to backend to generate embedding (without storing)
+        const apiUrl = 'http://localhost:8000/generate-embedding';
+        console.log(`Calling API: ${apiUrl}`);
+        setDebugInfo(prev => prev + `\nCalling API: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -318,60 +277,44 @@ export default function QuizPage() {
           body: JSON.stringify(formattedAnswers),
         });
         
-        // Handle different status codes
-        if (response.status === 422) {
-          const validationErrors = await response.json() as ErrorResponse;
-          console.error("Validation errors:", validationErrors);
-          
-          // Format validation errors for display
-          let errorMessage = "Validation error: ";
-          if (validationErrors.detail && Array.isArray(validationErrors.detail)) {
-            errorMessage += validationErrors.detail.map((err) => {
-              if (err.loc && err.loc.length > 1) {
-                return `Field '${err.loc[1]}': ${err.msg}`;
-              }
-              return err.msg;
-            }).join('; ');
-          } else {
-            errorMessage += JSON.stringify(validationErrors);
-          }
-          
-          throw new Error(errorMessage);
-        } else if (!response.ok) {
-          let errorMessage = `Failed to submit quiz results: ${response.status}`;
-          
-          try {
-            const errorData = await response.json() as ErrorResponse;
-            console.error("Error details:", errorData);
-            
-            if (errorData.detail) {
-              errorMessage = typeof errorData.detail === 'string' 
-                ? errorData.detail 
-                : JSON.stringify(errorData.detail);
-            }
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          } catch (_) { // Changed from 'error' to '_' to indicate it's intentionally unused
-            // If not JSON, get text
-            const errorText = await response.text();
-            console.error("Error response:", errorText);
-            errorMessage += ` ${errorText}`;
-          }
-          
-          throw new Error(errorMessage);
+        console.log("Response status:", response.status);
+        setDebugInfo(prev => prev + `\nResponse status: ${response.status}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`API error: ${response.status} ${errorText}`);
+          setDebugInfo(prev => prev + `\nAPI error: ${response.status} ${errorText}`);
+          throw new Error(`Failed to generate embedding: ${response.status} ${errorText}`);
         }
         
         const data = await response.json();
-        console.log('Success response:', data);
-        setCompleted(true);
+        console.log('Embedding generated successfully', data);
+        setDebugInfo(prev => prev + `\nEmbedding generated successfully with length: ${data.embedding?.length || 'unknown'}`);
         
-        // You could redirect to a results page here
-        // router.push('/quiz/results');
+        // Store the embedding in sessionStorage for the shop page to access
+        if (data.embedding) {
+          sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
+          
+          // Also store raw answers as fallback
+          sessionStorage.setItem('quiz_answers', JSON.stringify(formattedAnswers));
+          
+          setCompleted(true);
+          
+          // Wait a moment before redirecting to shop page
+          setTimeout(() => {
+            setIsRedirecting(true);
+            router.push('/shop?personalized=true');
+          }, 2000);
+        } else {
+          throw new Error('No embedding returned from server');
+        }
       } catch (err) {
         console.error('Error submitting quiz:', err);
+        setDebugInfo(prev => prev + `\nError submitting quiz: ${err instanceof Error ? err.message : String(err)}`);
         if (err instanceof Error) {
           setError(err.message);
         } else {
-          setError('Failed to submit quiz results');
+          setError('Failed to process quiz results');
         }
       } finally {
         setIsSubmitting(false);
@@ -392,15 +335,25 @@ export default function QuizPage() {
             
             <h2 className="text-3xl font-bold mb-4 text-gray-900">Thank You! 🎉</h2>
             <p className="text-lg text-gray-700 mb-6">
-              We&apos;ve received your quiz answers and are generating personalized recommendations for you!
+              We've analyzed your beauty profile and found your perfect product matches!
             </p>
             
-            <button
-              onClick={() => router.push('/shop')}
-              className="px-8 py-3 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-md hover:shadow-lg mx-auto"
-            >
-              Start shopping
-            </button>
+            {isRedirecting ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-rose-500"></div>
+                <p>Redirecting to your personalized shop...</p>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsRedirecting(true);
+                  router.push('/shop?personalized=true');
+                }}
+                className="px-8 py-3 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-md hover:shadow-lg mx-auto"
+              >
+                View personalized products
+              </button>
+            )}
           </div>
         </div>
       );
@@ -459,13 +412,6 @@ export default function QuizPage() {
                 </button>
               ))}
             </div>
-  
-            {/* Authentication warning */}
-            {!userId && (
-              <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 rounded-lg">
-                You are not logged in. Please log in to save your quiz results.
-              </div>
-            )}
             
             {/* Navigation */}
             <div className="flex justify-between">
@@ -497,21 +443,30 @@ export default function QuizPage() {
               {currentQuestion === quizQuestions.length - 1 && (
                 <button
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !userId}
+                  disabled={isSubmitting}
                   className={`
                     flex items-center gap-2 px-8 py-3 rounded-full bg-rose-500 text-white 
                     hover:bg-rose-600 transition-all shadow-md hover:shadow-lg
-                    ${(isSubmitting || !userId) ? 'opacity-70 cursor-not-allowed' : ''}
+                    ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}
                   `}
                 >
-                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                  {isSubmitting ? 'Analyzing...' : 'See your matches'}
                 </button>
               )}
             </div>
             
             {error && (
               <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg">
-                {error}
+                <p className="font-medium">Error:</p>
+                <p>{error}</p>
+              </div>
+            )}
+            
+            {/* Debug info - hidden in production */}
+            {process.env.NODE_ENV !== 'production' && debugInfo && (
+              <div className="mt-4 p-3 bg-gray-50 text-gray-700 rounded-lg text-xs font-mono whitespace-pre-wrap">
+                <p className="font-medium">Debug Info:</p>
+                <p>{debugInfo}</p>
               </div>
             )}
           </div>

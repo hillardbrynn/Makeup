@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { 
   Heart, 
@@ -11,9 +10,9 @@ import {
   Search, 
   Star, 
   Sparkles,
-  User,
   Menu,
-  Users
+  Users,
+  ArrowLeft
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -33,36 +32,28 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import Link from 'next/link';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 // Define TypeScript interfaces
-interface ProductType {
+interface BlushProduct {
   id: number;
   name: string;
   price: number;
-  discount_price?: number;
   brand: string;
-  image_url?: string;
+  image?: string;
   rating?: number;
-  reviews?: number;
-  category?: string;
+  type?: string;
+  color?: string;
+  skin_tone?: string;
+  under_tone?: string;
+  coverage_level?: string;
+  skin_type?: string;
+  restrictions?: string;
+  link?: string;
   similarityScore?: number;
 }
 
-interface UserType {
-  id: string;
-  email?: string;
-}
-
-interface ProductEmbedding {
-  product_id: number;
+interface BlushEmbedding {
+  blush_id: number;
   embedding: number[];
 }
 
@@ -72,25 +63,66 @@ export default function ShopPage() {
     return `/api/image?url=${encodeURIComponent(originalUrl)}`;
   };
   
-  const [products, setProducts] = useState<ProductType[]>([]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const comingFromQuiz = searchParams?.get('personalized') === 'true';
+  
+  const [products, setProducts] = useState<BlushProduct[]>([]);
+  const [allProducts, setAllProducts] = useState<BlushProduct[]>([]);
+  const [productEmbeddings, setProductEmbeddings] = useState<Record<number, number[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [category, setCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [userEmbedding, setUserEmbedding] = useState<number[] | null>(null);
-  const [isPersonalized, setIsPersonalized] = useState<boolean>(false);
-  const [, setPersonalizedProducts] = useState<ProductType[]>([]);
-  const [showingPersonalized, setShowingPersonalized] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
-  const router = useRouter();
+  const [showingPersonalized, setShowingPersonalized] = useState<boolean>(comingFromQuiz);
+  const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
+  const [hasQuizData, setHasQuizData] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
-  // Categories for filter buttons
-  const categories = ['all', 'foundation', 'concealer', 'blush', 'eyeshadow', 'mascara', 'lipstick'];
-
-  // Cosine similarity function to measure product match
-  function cosineSimilarity(vecA: number[], vecB: number[]): number {
-    if (!vecA || !vecB || vecA.length !== vecB.length) {
-      return 0;
+// Improved cosine similarity function with robust error handling
+  function cosineSimilarity(vecA: any, vecB: any): number {
+    // Check if both are arrays
+    if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
+      console.error('Invalid vectors', { 
+        vecAType: typeof vecA, 
+        vecBType: typeof vecB,
+        vecA: vecA && typeof vecA === 'object' ? JSON.stringify(vecA).substring(0, 100) : vecA,
+        vecB: vecB && typeof vecB === 'object' ? JSON.stringify(vecB).substring(0, 100) : vecB
+      });
+      
+      // Try to convert to arrays if they're in string format
+      if (typeof vecA === 'string') {
+        try {
+          vecA = JSON.parse(vecA);
+        } catch (e) {
+          console.error('Failed to parse vecA as JSON');
+        }
+      }
+      
+      if (typeof vecB === 'string') {
+        try {
+          vecB = JSON.parse(vecB);
+        } catch (e) {
+          console.error('Failed to parse vecB as JSON');
+        }
+      }
+      
+      // Check again after attempted conversion
+      if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
+        return 0;
+      }
+    }
+    
+    // Check if dimensions match
+    if (vecA.length !== vecB.length) {
+      console.warn(`Vector length mismatch: vecA=${vecA.length}, vecB=${vecB.length}`);
+      
+      // If one is longer, truncate to match the shorter one
+      const minLength = Math.min(vecA.length, vecB.length);
+      vecA = vecA.slice(0, minLength);
+      vecB = vecB.slice(0, minLength);
+      
+      console.log(`Truncated vectors to length ${minLength}`);
     }
     
     let dotProduct = 0;
@@ -98,218 +130,305 @@ export default function ShopPage() {
     let normB = 0;
     
     for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+      // Make sure values are numbers
+      const a = Number(vecA[i]);
+      const b = Number(vecB[i]);
+      
+      if (isNaN(a) || isNaN(b)) {
+        console.error(`Non-numeric values at index ${i}: ${vecA[i]}, ${vecB[i]}`);
+        continue;
+      }
+      
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
     }
     
     if (normA === 0 || normB === 0) {
+      console.warn('Zero norm detected', { normA, normB });
       return 0;
     }
     
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    return similarity;
   }
 
-  // Fetch user's quiz embedding and user information
-  useEffect(() => {
-    async function fetchUserQuizEmbedding() {
+  // Add this function to help parse embeddings that might be stored in different formats
+  function parseEmbedding(embedding: any): number[] {
+    if (Array.isArray(embedding)) {
+      return embedding;
+    }
+    
+    if (typeof embedding === 'string') {
       try {
-        // Get current user
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error("Error fetching session:", sessionError);
-          return null;
+        // Try to parse as JSON
+        const parsed = JSON.parse(embedding);
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
-        
-        if (!session?.user) {
-          console.log("No user logged in - skipping personalization");
-          setCurrentUser(null);
-          return null;
-        }
-        
-        // Set current user information
-        setCurrentUser({
-          id: session.user.id,
-          email: session.user.email
-        });
-        
-        const userId = session.user.id;
-        console.log("Fetching quiz embedding for user:", userId);
-        
-        // Get the user's latest quiz data
-        const { data: quizData, error: quizError } = await supabase
-          .from('quiz')
-          .select('id')
-          .eq('user_id', userId)
-          .order('id', { ascending: false })
-          .limit(1);
-        
-        if (quizError) {
-          console.error("Error fetching quiz data:", quizError);
-          return null;
-        }
-        
-        if (!quizData || quizData.length === 0) {
-          console.log("No quiz data found for user");
-          return null;
-        }
-        
-        const quizId = quizData[0].id;
-        console.log("Found latest quiz ID:", quizId);
-        
-        // Get the quiz embedding
-        const { data: embeddingData, error: embeddingError } = await supabase
-          .from('quiz_embedding')
-          .select('embedding')
-          .eq('quiz_id', quizId)
-          .limit(1);
-        
-        if (embeddingError) {
-          console.error("Error fetching embedding:", embeddingError);
-          return null;
-        }
-        
-        if (!embeddingData || embeddingData.length === 0) {
-          console.log("No embedding found for quiz");
-          return null;
-        }
-        
-        console.log("Found user embedding");
-        return embeddingData[0].embedding;
-      } catch (err) {
-        console.error("Error in fetchUserQuizEmbedding:", err);
-        return null;
+      } catch (e) {
+        console.error('Failed to parse embedding as JSON string', embedding);
       }
     }
     
-    async function initialize() {
-      const embedding = await fetchUserQuizEmbedding();
-      setUserEmbedding(embedding);
-      setIsPersonalized(!!embedding);
+    if (embedding && typeof embedding === 'object') {
+      // It might be a Postgres array type returned from Supabase
+      // Let's try to extract the values
+      try {
+        const values = Object.values(embedding);
+        if (values.length > 0 && !isNaN(Number(values[0]))) {
+          return values.map(v => Number(v));
+        }
+      } catch (e) {
+        console.error('Failed to extract values from embedding object', embedding);
+      }
     }
     
-    initialize();
-  }, []);
+    console.error('Could not parse embedding', embedding);
+    return [];
+  }
+  
 
-  // Fetch products and calculate similarity scores if user has an embedding
+  // Get embedding from sessionStorage
   useEffect(() => {
-    async function fetchProductsWithSimilarity() {
+    const getEmbedding = () => {
+      try {
+        setLoadingEmbedding(true);
+        
+        const embeddingStr = sessionStorage.getItem('quiz_embedding');
+        if (embeddingStr) {
+          const embedding = JSON.parse(embeddingStr);
+          console.log("Found embedding in sessionStorage with length:", embedding.length);
+          setDebugInfo(prev => prev + `\nFound embedding with length: ${embedding.length}`);
+          setUserEmbedding(embedding);
+          setHasQuizData(true);
+          
+          // Automatically enable personalized view if coming from quiz
+          if (comingFromQuiz) {
+            setShowingPersonalized(true);
+          }
+        } else {
+          console.log("No embedding found in sessionStorage");
+          setDebugInfo(prev => prev + "\nNo embedding found in sessionStorage");
+          
+          // Check for quiz answers as fallback
+          const quizAnswers = sessionStorage.getItem('quiz_answers');
+          if (quizAnswers) {
+            console.log("Found quiz answers, generating embedding");
+            setDebugInfo(prev => prev + "\nFound quiz answers, generating embedding");
+            
+            // Generate embedding from answers
+            fetch('http://localhost:8000/generate-embedding', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: quizAnswers,
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Failed to generate embedding');
+              }
+              return response.json();
+            })
+            .then(data => {
+              if (data.embedding) {
+                console.log("Generated embedding with length:", data.embedding.length);
+                setDebugInfo(prev => prev + `\nGenerated embedding with length: ${data.embedding.length}`);
+                setUserEmbedding(data.embedding);
+                setHasQuizData(true);
+                sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
+                
+                if (comingFromQuiz) {
+                  setShowingPersonalized(true);
+                }
+              }
+            })
+            .catch(err => {
+              console.error("Error generating embedding:", err);
+              setDebugInfo(prev => prev + `\nError generating embedding: ${err.message}`);
+            });
+          }
+        }
+        
+        setLoadingEmbedding(false);
+      } catch (err) {
+        console.error("Error getting embedding:", err);
+        setDebugInfo(prev => prev + `\nError getting embedding: ${err instanceof Error ? err.message : String(err)}`);
+        setLoadingEmbedding(false);
+      }
+    };
+    
+    getEmbedding();
+  }, [comingFromQuiz]);
+
+  // Replace the entire fetch data function with this version:
+
+  // Fetch blush products and embeddings
+  useEffect(() => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch all products
-        let query = supabase.from('products').select('*');
-        
-        // Apply category filter if not "all"
-        if (category !== 'all') {
-          query = query.eq('category', category);
+        // Fetch products from Supabase
+        const productsResponse = await fetch('/api/blush');
+        if (!productsResponse.ok) {
+          throw new Error('Failed to fetch blush products');
         }
+        const blushProducts = await productsResponse.json();
         
-        // Apply search filter if there's a query
-        if (searchQuery) {
-          query = query.ilike('name', `%${searchQuery}%`);
+        // Fetch embeddings from Supabase
+        const embeddingsResponse = await fetch('/api/blush-embeddings');
+        if (!embeddingsResponse.ok) {
+          throw new Error('Failed to fetch blush embeddings');
         }
-        
-        const { data: productsData, error: productsError } = await query;
-        
-        if (productsError) {
-          throw productsError;
-        }
-        
-        const typedProductsData = productsData as ProductType[] || [];
-        
-        // If we have user embeddings, fetch product embeddings and calculate similarity
-        if (userEmbedding) {
-          // Fetch all product embeddings
-          const { data: embeddings, error: embeddingsError } = await supabase
-            .from('product_embeddings')
-            .select('product_id, embedding');
-          
-          if (embeddingsError) {
-            throw embeddingsError;
-          }
-          
-          // Create mapping of product_id to embedding
-          const embeddingMap: Record<number, number[]> = {};
-          (embeddings as ProductEmbedding[]).forEach(item => {
-            embeddingMap[item.product_id] = item.embedding;
+        const blushEmbeddings = await embeddingsResponse.json();
+
+        // Create embeddings map for quick access
+        const embeddings: Record<number, number[]> = {};
+        let embeddingParseErrors = 0;
+
+        // Debug the structure of the first embedding to understand its format
+        if (blushEmbeddings.length > 0) {
+          const firstEmbedding = blushEmbeddings[0];
+          console.log('First product embedding structure:', {
+            blush_id: firstEmbedding.blush_id,
+            embedding_type: typeof firstEmbedding.embedding,
+            embedding_sample: JSON.stringify(firstEmbedding.embedding).substring(0, 100) + '...'
           });
-          
-          // Calculate similarity score for each product
-          const productsWithScore = typedProductsData.map(product => {
-            const embedding = embeddingMap[product.id];
-            let similarityScore = 0;
-            
-            if (embedding && userEmbedding) {
-              similarityScore = cosineSimilarity(embedding, userEmbedding);
+        }
+
+        // Process all embeddings
+        blushEmbeddings.forEach((item: BlushEmbedding) => {
+          try {
+            const parsedEmbedding = parseEmbedding(item.embedding);
+            if (parsedEmbedding.length > 0) {
+              embeddings[item.blush_id] = parsedEmbedding;
+              console.log(`Processed embedding for product ${item.blush_id}: length = ${parsedEmbedding.length}`);
+            } else {
+              embeddingParseErrors++;
             }
-            
-            return { ...product, similarityScore };
-          });
-          
-          // Sort by similarity score (highest first)
-          productsWithScore.sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
-          
-          setPersonalizedProducts(productsWithScore);
-          
-          // If we're showing personalized results, use the sorted list
-          if (showingPersonalized) {
-            setProducts(productsWithScore);
-          } else {
-            setProducts(typedProductsData);
+          } catch (err) {
+            console.error(`Error parsing embedding for product ${item.blush_id}:`, err);
+            embeddingParseErrors++;
           }
-        } else {
-          // No user embedding, just use regular products
-          setProducts(typedProductsData);
-        }
+        });
+
+        console.log(`Successfully processed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
+        setDebugInfo(prev => prev + `\nProcessed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
         
-        console.log("Fetched products:", typedProductsData.length);
+        setAllProducts(blushProducts);
+        setProductEmbeddings(embeddings);
       } catch (err) {
-        console.error('Error fetching products:', err);
+        console.error('Error fetching data:', err);
+        setDebugInfo(prev => prev + `\nError fetching data: ${err instanceof Error ? err.message : String(err)}`);
         setError('Failed to load products. Please try again.');
       } finally {
         setLoading(false);
       }
+    };
+    
+    fetchData();
+  }, []);
+
+  // Apply filters and sorting based on user embedding
+  useEffect(() => {
+    if (!allProducts.length) return;
+    
+    try {
+      // Apply search filter
+      let filteredProducts = [...allProducts];
+      
+      if (searchQuery) {
+        filteredProducts = filteredProducts.filter(product => 
+          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+      
+      // Replace this part in your useEffect that applies filters and sorting
+      // If we have user embedding and showing personalized results, sort by similarity
+      if (userEmbedding && showingPersonalized) {
+        console.log("Calculating similarity scores for products");
+        setDebugInfo(prev => prev + "\nCalculating similarity scores");
+        
+        // Verify user embedding is valid
+        if (!Array.isArray(userEmbedding)) {
+          console.error("User embedding is not an array:", userEmbedding);
+          setDebugInfo(prev => prev + "\nERROR: User embedding is not an array");
+          setProducts(filteredProducts);
+          return;
+        }
+        
+        // Calculate similarity score for each product
+        const productsWithScore = filteredProducts.map(product => {
+          const embedding = productEmbeddings[product.id];
+          let similarityScore = 0;
+          
+          if (embedding) {
+            try {
+              similarityScore = cosineSimilarity(embedding, userEmbedding);
+              console.log(`Product ${product.id} (${product.name}) score: ${similarityScore.toFixed(4)}`);
+            } catch (err) {
+              console.error(`Error calculating similarity for product ${product.id}:`, err);
+            }
+          } else {
+            console.log(`No embedding for product ${product.id} (${product.name})`);
+          }
+          
+          return { 
+            ...product, 
+            similarityScore: similarityScore 
+          };
+        });
+        
+        // Extract scores for debugging
+        const scoreMap = productsWithScore.reduce((map, product) => {
+          map[product.id] = product.similarityScore || 0;
+          return map;
+        }, {} as Record<number, number>);
+        
+        console.log("Product scores:", scoreMap);
+        setDebugInfo(prev => prev + `\nProduct scores: ${JSON.stringify(scoreMap)}`);
+        
+        // Log before sorting
+        console.log("Before sorting, first few products:", 
+          productsWithScore.slice(0, 3).map(p => `${p.name}: ${p.similarityScore}`));
+        
+        // Sort by similarity score (highest first)
+        const sortedProducts = [...productsWithScore].sort((a, b) => {
+          const scoreA = a.similarityScore || 0;
+          const scoreB = b.similarityScore || 0;
+          return scoreB - scoreA;
+        });
+        
+        // Log after sorting
+        console.log("After sorting, first few products:", 
+          sortedProducts.slice(0, 3).map(p => `${p.name}: ${p.similarityScore}`));
+        
+        setProducts(sortedProducts);
+      } else {
+        // No personalization, just use filtered products
+        setProducts(filteredProducts);
+      }
+    } catch (err) {
+      console.error('Error applying filters:', err);
+      setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
     }
-
-    fetchProductsWithSimilarity();
-  }, [category, searchQuery, userEmbedding, showingPersonalized]);
-
-  const handleCategoryChange = (newCategory: string): void => {
-    setCategory(newCategory);
-  };
+  }, [allProducts, searchQuery, userEmbedding, showingPersonalized, productEmbeddings]);
 
   const handleSearch = (e: React.FormEvent): void => {
     e.preventDefault();
-    // Search is already triggered by the effect above
+    // Search is already handled in the effect
   };
 
   const togglePersonalization = (): void => {
     setShowingPersonalized(!showingPersonalized);
   };
   
-  // Handle user logout
-  const handleLogout = async (): Promise<void> => {
-    try {
-      // Simply call signOut and let the auth route handler take care of redirection
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error("Error signing out:", error);
-      } else {
-        // Clear local state immediately for a responsive UI feel
-        setCurrentUser(null);
-        setUserEmbedding(null);
-        setIsPersonalized(false);
-        setPersonalizedProducts([]);
-        setShowingPersonalized(false);
-        
-        // The redirection will be handled by the /auth route.js file
-      }
-    } catch (err) {
-      console.error("Error in logout:", err);
-    }
+  // Take the quiz button handler
+  const handleTakeQuiz = (): void => {
+    router.push('/quiz');
   };
 
   return (
@@ -325,15 +444,7 @@ export default function ShopPage() {
           <div className="flex items-center gap-2">
             <div 
               className="flex items-center gap-2 cursor-pointer"
-              onClick={async () => {
-                // Check if user is logged in via Supabase
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session?.user) {
-                  // Not logged in, navigate to home
-                  router.push('/');
-                }
-                // If logged in, do nothing (stay on current page)
-              }}
+              onClick={() => router.push('/')}
             >
               <ShoppingBag className="h-6 w-6 text-rose-500" />
               <span className="text-xl font-bold text-gray-900">acquired.beauty</span>
@@ -345,17 +456,7 @@ export default function ShopPage() {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  {/* Home link with conditional navigation */}
-                  <span onClick={async (e) => {
-                    e.preventDefault();
-                    // Check if user is logged in via Supabase
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (!session?.user) {
-                      // Not logged in, navigate to home
-                      router.push('/');
-                    }
-                    // If logged in, do nothing (stay on current page)
-                  }}>
+                  <span onClick={() => router.push('/')}>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                       Home
                     </NavigationMenuLink>
@@ -369,49 +470,9 @@ export default function ShopPage() {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger>Categories</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                      {categories.slice(1).map((cat) => (
-                        <li key={cat} className="row-span-1">
-                          <Link href={cat === 'blush' ? `/shop?category=${cat}` : '#'} passHref legacyBehavior>
-                            <NavigationMenuLink asChild>
-                              <a
-                                className={`flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-rose-50 to-white p-6 no-underline outline-none focus:shadow-md ${cat !== 'blush' ? 'cursor-default' : ''}`}
-                              >
-                                <div className="mb-2 mt-4 text-lg font-medium capitalize text-rose-500">
-                                  {cat}
-                                </div>
-                                <p className="text-sm leading-tight text-gray-500">
-                                  {cat === 'blush' 
-                                    ? 'Shop our collection of blush products' 
-                                    : <span className="flex items-center">
-                                        <span className="text-rose-400 font-medium">Coming Soon</span>
-                                      </span>
-                                  }
-                                </p>
-                              </a>
-                            </NavigationMenuLink>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
                   <Link href="/quiz" legacyBehavior passHref>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                       Beauty Quiz
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <Link href="/community" legacyBehavior passHref>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        <span>Community</span>
-                      </span>
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
@@ -421,54 +482,6 @@ export default function ShopPage() {
 
           {/* Right side icons */}
           <div className="flex items-center gap-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-gray-700 hover:text-rose-500">
-                  <User className="h-5 w-5" />
-                  {currentUser && (
-                    <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-green-500" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56">
-                {currentUser ? (
-                  <>
-                    <DropdownMenuLabel>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium">Logged in as</p>
-                        <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile">My Profile</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/orders">My Orders</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/quiz">Beauty Quiz</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-500 focus:text-red-500">
-                      Logout
-                    </DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuLabel>Not logged in</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/login">Login</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/signup">Create Account</Link>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
               <Link href="/wishlist">
                 <Heart className="h-5 w-5" />
@@ -487,22 +500,14 @@ export default function ShopPage() {
                   <SheetHeader>
                     <SheetTitle>BeautyShop</SheetTitle>
                     <SheetDescription>
-                      Find your perfect beauty products
+                      Find your perfect blush products
                     </SheetDescription>
                   </SheetHeader>
                   <div className="flex flex-col gap-4 py-4">
                     <Button 
                       variant="ghost" 
                       className="justify-start w-full"
-                      onClick={async () => {
-                        // Check if user is logged in
-                        const { data: { session } } = await supabase.auth.getSession();
-                        if (!session?.user) {
-                          // Not logged in, navigate to home
-                          router.push('/');
-                        }
-                        // If logged in, do nothing (stay on current page)
-                      }}
+                      onClick={() => router.push('/')}
                     >
                       Home
                     </Button>
@@ -516,19 +521,6 @@ export default function ShopPage() {
                         Beauty Quiz
                       </Button>
                     </Link>
-                    <div className="py-2">
-                      <p className="text-sm font-medium text-gray-500 mb-2">Categories</p>
-                      {categories.slice(1).map((cat) => (
-                        <Link key={cat} href={`/shop?category=${cat}`} passHref>
-                          <Button 
-                            variant="ghost" 
-                            className="justify-start capitalize w-full text-gray-700"
-                          >
-                            {cat}
-                          </Button>
-                        </Link>
-                      ))}
-                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
@@ -538,15 +530,50 @@ export default function ShopPage() {
       </header>
       <div className="h-10 w-full items-center bg-gradient-to-r from-rose-500 to-rose-400 justify-between"></div>
       <div className="relative z-10 container mx-auto px-6 py-10">
+        {/* Show "Back to Quiz" button if coming from quiz */}
+        {comingFromQuiz && (
+          <div className="mb-6">
+            <Button 
+              variant="outline" 
+              className="flex items-center gap-2"
+              onClick={() => router.push('/quiz')}
+            >
+              <ArrowLeft size={16} />
+              Back to Quiz
+            </Button>
+          </div>
+        )}
+        
         {/* Header */}
         <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">Product Book</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Discover products curated just for you based on your beauty profile.
-          </p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Blush Collection</h1>
+          
+          {/* Show personalized message if coming from quiz */}
+          {comingFromQuiz ? (
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Here are your personalized blush recommendations based on your beauty quiz results!
+            </p>
+          ) : (
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Discover perfect blush products curated just for your skin tone and preferences.
+            </p>
+          )}
+          
+          {/* User didn't take quiz yet - show CTA */}
+          {!hasQuizData && !comingFromQuiz && (
+            <div className="mt-6">
+              <Button
+                onClick={handleTakeQuiz}
+                className="px-6 py-2 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-md hover:shadow-lg flex items-center gap-2 mx-auto"
+              >
+                <Sparkles size={16} className="text-yellow-300" />
+                Take the Beauty Quiz for Personalized Recommendations
+              </Button>
+            </div>
+          )}
           
           {/* Personalization toggle */}
-          {isPersonalized && (
+          {hasQuizData && (
             <div className="mt-4">
               <button
                 onClick={togglePersonalization}
@@ -564,15 +591,15 @@ export default function ShopPage() {
           )}
         </div>
 
-        {/* Search and filter section */}
+        {/* Search section */}
         <div className="mb-10 bg-white rounded-xl shadow-md p-6">
           <div className="flex flex-col md:flex-row gap-6 items-center">
             {/* Search bar */}
-            <div className="w-full md:w-1/3">
+            <div className="w-full">
               <form onSubmit={handleSearch} className="relative">
                 <input
                   type="text"
-                  placeholder="Search products..."
+                  placeholder="Search blush products..."
                   className="w-full px-4 py-3 pl-10 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -580,28 +607,18 @@ export default function ShopPage() {
                 <Search size={18} className="absolute left-3 top-3.5 text-gray-400" />
               </form>
             </div>
-
-            {/* Filter buttons */}
-            <div className="flex flex-wrap gap-2 justify-center md:justify-start flex-grow">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all ${
-                    category === cat
-                      ? 'bg-rose-500 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  onClick={() => handleCategoryChange(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-              <button className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700">
-                <Filter size={18} />
-              </button>
-            </div>
           </div>
         </div>
+
+        {/* Loading state for personalization */}
+        {loadingEmbedding && comingFromQuiz && (
+          <div className="flex justify-center items-center p-10 bg-white rounded-xl shadow-md mb-10">
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-500 mb-4"></div>
+              <p className="text-gray-700">Personalizing your recommendations...</p>
+            </div>
+          </div>
+        )}
 
         {/* Products grid */}
         {loading ? (
@@ -620,7 +637,7 @@ export default function ShopPage() {
           </div>
         ) : products.length === 0 ? (
           <div className="text-center p-10 bg-white rounded-xl shadow-md">
-            <p className="text-gray-600">No products found. Try a different search or category.</p>
+            <p className="text-gray-600">No products found. Try a different search.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -629,14 +646,14 @@ export default function ShopPage() {
                 key={product.id} 
                 className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
               >
-                <Link href={`/shop/product/${product.id}`} passHref>
+                <a href={product.link || '#'} target="_blank" rel="noopener noreferrer">
                   {/* Product Image */}
                   <div className="relative h-56 bg-gray-100">
-                    {product.image_url ? (
+                    {product.image ? (
                       <div className="relative w-full h-full">
                         <img 
-                          src={getProxiedImageUrl(product.image_url)} 
-                          alt={product.name || "Product"}
+                          src={product.image} 
+                          alt={product.name || "Blush Product"}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -663,18 +680,16 @@ export default function ShopPage() {
                     >
                       <Heart size={18} className="text-gray-500 hover:text-rose-500" />
                     </button>
-
-                    {/* Sale tag if discounted */}
-                    {product.discount_price && (
-                      <div className="absolute top-3 left-3 px-3 py-1 bg-rose-500 text-white text-xs font-bold rounded-full">
-                        Sale
-                      </div>
-                    )}
                     
-                    {/* Match score indicator */}
-                    {showingPersonalized && product.similarityScore && product.similarityScore > 0 && (
-                      <div className="absolute bottom-3 left-3 px-3 py-1 bg-white/90 text-rose-500 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm">
-                        <Sparkles size={12} />
+                    {/* Match score indicator - show more prominently if coming from quiz */}
+                    {(showingPersonalized || comingFromQuiz) && product.similarityScore && product.similarityScore > 0 && (
+                      <div className={`
+                        absolute bottom-3 left-3 px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm
+                        ${comingFromQuiz 
+                          ? 'bg-rose-500 text-white' 
+                          : 'bg-white/90 text-rose-500'}
+                      `}>
+                        <Sparkles size={12} className={comingFromQuiz ? "text-yellow-300" : ""} />
                         {Math.round(product.similarityScore * 100)}% Match
                       </div>
                     )}
@@ -699,24 +714,48 @@ export default function ShopPage() {
                           />
                         ))}
                       </div>
-                      <span className="text-xs text-gray-500 ml-1">({product.reviews || 0})</span>
+                      <span className="text-xs text-gray-500 ml-1">({product.rating ? product.rating.toFixed(1) : 'N/A'})</span>
                     </div>
                     
+                    {/* Color if available */}
+                    {product.color && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-gray-600">Color:</span>
+                        <span className="text-xs font-medium">{product.color}</span>
+                      </div>
+                    )}
+                    
                     {/* Price */}
-                    <div className="flex items-center">
-                      {product.discount_price ? (
-                        <>
-                          <span className="font-bold text-rose-500">${product.discount_price}</span>
-                          <span className="text-gray-400 text-sm line-through ml-2">${product.price}</span>
-                        </>
-                      ) : (
-                        <span className="font-bold text-gray-900">${product.price}</span>
-                      )}
+                    <div className="flex items-center mt-2">
+                      <span className="font-bold text-gray-900">${product.price}</span>
                     </div>
                   </div>
-                </Link>
+                </a>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Debug info section - hidden in production */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div className="mt-10 p-4 bg-gray-100 rounded-lg text-xs font-mono whitespace-pre-wrap">
+            <h3 className="font-bold mb-2">Debug Info:</h3>
+            <p>User Embedding: {userEmbedding ? `${userEmbedding.length} dimensions` : 'None'}</p>
+            <p>Product Embeddings: {Object.keys(productEmbeddings).length} loaded</p>
+            <p>Showing Personalized: {showingPersonalized ? 'Yes' : 'No'}</p>
+            <p>Products count: {products.length}</p>
+            {products.length > 0 && showingPersonalized && (
+              <div className="mt-2">
+                <p className="font-bold">Top 3 Matches:</p>
+                {products.slice(0, 3).map((p, i) => (
+                  <p key={i}>{i+1}. {p.name} - {p.similarityScore ? `${(p.similarityScore * 100).toFixed(2)}%` : 'No score'}</p>
+                ))}
+              </div>
+            )}
+            <div className="mt-2">
+              <p className="font-bold">Log:</p>
+              <p>{debugInfo}</p>
+            </div>
           </div>
         )}
       </div>

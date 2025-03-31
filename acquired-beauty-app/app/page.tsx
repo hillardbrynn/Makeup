@@ -31,15 +31,15 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
+              {/* <Button 
                 onClick={() => router.push("/login")}
                 className="px-8 py-6 text-lg bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
               >
                 Log in
               </Button>
-              
+               */}
               <Button 
-                onClick={() => router.push("/signup")}
+                onClick={() => router.push("/quiz")}
                 className="px-8 py-6 text-lg bg-white hover:bg-gray-50 text-rose-500 border border-rose-300 rounded-full shadow-md hover:shadow-lg transition-all"
               >
                 Get Started

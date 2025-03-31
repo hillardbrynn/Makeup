@@ -30,78 +30,78 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
+  // const [user, setUser] = useState<User | null>(null);
+  // const [loading, setLoading] = useState(true);
+  // const router = useRouter();
+  // const pathname = usePathname();
 
-  useEffect(() => {
-    // Check current session
-    const getUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-      } catch (error) {
-        console.error('Error getting user:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // useEffect(() => {
+  //   // Check current session
+  //   const getUser = async () => {
+  //     try {
+  //       const { data: { user } } = await supabase.auth.getUser();
+  //       setUser(user);
+  //     } catch (error) {
+  //       console.error('Error getting user:', error);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-    getUser();
+  //   getUser();
 
-    // Set up auth state listener
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user || null);
+  //   // Set up auth state listener
+  //   const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+  //     setUser(session?.user || null);
 
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setTimeout(() => {
-          router.replace('/auth');
-        }, 100);
-      } else if (event === 'SIGNED_IN') {
-        const returnUrl = localStorage.getItem('returnUrl');
-        if (returnUrl) {
-          localStorage.removeItem('returnUrl');
-          router.push(returnUrl);
-        } else {
-          router.push('/shop');
-        }
-      }
-    });
+  //     if (event === 'SIGNED_OUT') {
+  //       setUser(null);
+  //       setTimeout(() => {
+  //         router.replace('/auth');
+  //       }, 100);
+  //     } else if (event === 'SIGNED_IN') {
+  //       const returnUrl = localStorage.getItem('returnUrl');
+  //       if (returnUrl) {
+  //         localStorage.removeItem('returnUrl');
+  //         router.push(returnUrl);
+  //       } else {
+  //         router.push('/shop');
+  //       }
+  //     }
+  //   });
 
-    return () => {
-      listener?.subscription?.unsubscribe();
-    };
-  }, [router]);
+  //   return () => {
+  //     listener?.subscription?.unsubscribe();
+  //   };
+  // }, [router]);
 
-  useEffect(() => {
-    if (loading) return;
+  // useEffect(() => {
+  //   if (loading) return;
 
-    // Handle protected routes
-    if (protectedRoutes.includes(pathname) && !user) {
-      localStorage.setItem('returnUrl', pathname);
-      router.push('/auth');
-    }
+  //   // Handle protected routes
+  //   if (protectedRoutes.includes(pathname) && !user) {
+  //     localStorage.setItem('returnUrl', pathname);
+  //     router.push('/auth');
+  //   }
 
-    // Handle auth routes (redirect to dashboard if already logged in)
-    if (authRoutes.includes(pathname) && user) {
-      router.push('/shop');
-    }
-  }, [pathname, user, loading, router]);
+  //   // Handle auth routes (redirect to dashboard if already logged in)
+  //   if (authRoutes.includes(pathname) && user) {
+  //     router.push('/shop');
+  //   }
+  // }, [pathname, user, loading, router]);
 
-  // Show loading state
-  if (loading) {
-    return (
-      <html lang="en">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-500"></div>
-          </div>
-        </body>
-      </html>
-    );
-  }
+  // // Show loading state
+  // if (loading) {
+  //   return (
+  //     <html lang="en">
+  //       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+  //         <div className="min-h-screen flex items-center justify-center">
+  //           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-500"></div>
+  //         </div>
+  //       </body>
+  //     </html>
+  //   );
+  // }
 
   return (
     <html lang="en">
