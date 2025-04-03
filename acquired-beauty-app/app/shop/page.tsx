@@ -1,26 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image'; // Import Next.js Image component
 import { 
   Heart, 
   ShoppingBag, 
-  Filter, 
   Search, 
   Star, 
   Sparkles,
   Menu,
-  Users,
   ArrowLeft
 } from 'lucide-react';
 import {
   NavigationMenu,
-  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import {
@@ -54,15 +51,11 @@ interface BlushProduct {
 
 interface BlushEmbedding {
   blush_id: number;
-  embedding: number[];
+  embedding: number[] | string | Record<string, number>;
 }
 
-export default function ShopPage() {
-  const getProxiedImageUrl = (originalUrl?: string): string => {
-    if (!originalUrl) return "/placeholder-product.png";
-    return `/api/image?url=${encodeURIComponent(originalUrl)}`;
-  };
-  
+// Main shop component that uses client-side features
+function ShopPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const comingFromQuiz = searchParams?.get('personalized') === 'true';
@@ -77,10 +70,11 @@ export default function ShopPage() {
   const [showingPersonalized, setShowingPersonalized] = useState<boolean>(comingFromQuiz);
   const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  // We'll keep this commented out since it's not being used
+// const [debugInfo, setDebugInfo] = useState<string>(''); 
 
-// Improved cosine similarity function with robust error handling
-  function cosineSimilarity(vecA: any, vecB: any): number {
+  // Improved cosine similarity function with robust error handling
+  function cosineSimilarity(vecA: number[] | string | Record<string, number>, vecB: number[] | string | Record<string, number>): number {
     // Check if both are arrays
     if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
       console.error('Invalid vectors', { 
@@ -94,7 +88,7 @@ export default function ShopPage() {
       if (typeof vecA === 'string') {
         try {
           vecA = JSON.parse(vecA);
-        } catch (e) {
+        } catch {
           console.error('Failed to parse vecA as JSON');
         }
       }
@@ -102,7 +96,7 @@ export default function ShopPage() {
       if (typeof vecB === 'string') {
         try {
           vecB = JSON.parse(vecB);
-        } catch (e) {
+        } catch {
           console.error('Failed to parse vecB as JSON');
         }
       }
@@ -154,7 +148,7 @@ export default function ShopPage() {
   }
 
   // Add this function to help parse embeddings that might be stored in different formats
-  function parseEmbedding(embedding: any): number[] {
+  function parseEmbedding(embedding: number[] | string | Record<string, number>): number[] {
     if (Array.isArray(embedding)) {
       return embedding;
     }
@@ -166,7 +160,7 @@ export default function ShopPage() {
         if (Array.isArray(parsed)) {
           return parsed;
         }
-      } catch (e) {
+      } catch {
         console.error('Failed to parse embedding as JSON string', embedding);
       }
     }
@@ -179,7 +173,7 @@ export default function ShopPage() {
         if (values.length > 0 && !isNaN(Number(values[0]))) {
           return values.map(v => Number(v));
         }
-      } catch (e) {
+      } catch {
         console.error('Failed to extract values from embedding object', embedding);
       }
     }
@@ -199,7 +193,6 @@ export default function ShopPage() {
         if (embeddingStr) {
           const embedding = JSON.parse(embeddingStr);
           console.log("Found embedding in sessionStorage with length:", embedding.length);
-          setDebugInfo(prev => prev + `\nFound embedding with length: ${embedding.length}`);
           setUserEmbedding(embedding);
           setHasQuizData(true);
           
@@ -209,13 +202,11 @@ export default function ShopPage() {
           }
         } else {
           console.log("No embedding found in sessionStorage");
-          setDebugInfo(prev => prev + "\nNo embedding found in sessionStorage");
           
           // Check for quiz answers as fallback
           const quizAnswers = sessionStorage.getItem('quiz_answers');
           if (quizAnswers) {
             console.log("Found quiz answers, generating embedding");
-            setDebugInfo(prev => prev + "\nFound quiz answers, generating embedding");
             
             // Generate embedding from answers
             fetch('http://localhost:8000/generate-embedding', {
@@ -234,7 +225,6 @@ export default function ShopPage() {
             .then(data => {
               if (data.embedding) {
                 console.log("Generated embedding with length:", data.embedding.length);
-                setDebugInfo(prev => prev + `\nGenerated embedding with length: ${data.embedding.length}`);
                 setUserEmbedding(data.embedding);
                 setHasQuizData(true);
                 sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
@@ -246,7 +236,6 @@ export default function ShopPage() {
             })
             .catch(err => {
               console.error("Error generating embedding:", err);
-              setDebugInfo(prev => prev + `\nError generating embedding: ${err.message}`);
             });
           }
         }
@@ -254,7 +243,6 @@ export default function ShopPage() {
         setLoadingEmbedding(false);
       } catch (err) {
         console.error("Error getting embedding:", err);
-        setDebugInfo(prev => prev + `\nError getting embedding: ${err instanceof Error ? err.message : String(err)}`);
         setLoadingEmbedding(false);
       }
     };
@@ -315,13 +303,11 @@ export default function ShopPage() {
         });
 
         console.log(`Successfully processed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
-        setDebugInfo(prev => prev + `\nProcessed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
         
         setAllProducts(blushProducts);
         setProductEmbeddings(embeddings);
       } catch (err) {
         console.error('Error fetching data:', err);
-        setDebugInfo(prev => prev + `\nError fetching data: ${err instanceof Error ? err.message : String(err)}`);
         setError('Failed to load products. Please try again.');
       } finally {
         setLoading(false);
@@ -350,12 +336,10 @@ export default function ShopPage() {
       // If we have user embedding and showing personalized results, sort by similarity
       if (userEmbedding && showingPersonalized) {
         console.log("Calculating similarity scores for products");
-        setDebugInfo(prev => prev + "\nCalculating similarity scores");
         
         // Verify user embedding is valid
         if (!Array.isArray(userEmbedding)) {
           console.error("User embedding is not an array:", userEmbedding);
-          setDebugInfo(prev => prev + "\nERROR: User embedding is not an array");
           setProducts(filteredProducts);
           return;
         }
@@ -389,7 +373,6 @@ export default function ShopPage() {
         }, {} as Record<number, number>);
         
         console.log("Product scores:", scoreMap);
-        setDebugInfo(prev => prev + `\nProduct scores: ${JSON.stringify(scoreMap)}`);
         
         // Log before sorting
         console.log("Before sorting, first few products:", 
@@ -413,7 +396,6 @@ export default function ShopPage() {
       }
     } catch (err) {
       console.error('Error applying filters:', err);
-      setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [allProducts, searchQuery, userEmbedding, showingPersonalized, productEmbeddings]);
 
@@ -651,15 +633,15 @@ export default function ShopPage() {
                   <div className="relative h-56 bg-gray-100">
                     {product.image ? (
                       <div className="relative w-full h-full">
-                        <img 
+                        <Image 
                           src={product.image} 
                           alt={product.name || "Blush Product"}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            console.error(`Error loading image for ${product.name}:`, e);
-                            target.src = "/placeholder-product.png";
-                            target.onerror = null;
+                          fill
+                          className="object-cover"
+                          onError={() => {
+                            console.error(`Error loading image for ${product.name}`);
+                            // Note: We can't directly modify src in Next.js Image component on error
+                            // This would require a state to track failed images
                           }}
                         />
                       </div>
@@ -735,30 +717,25 @@ export default function ShopPage() {
             ))}
           </div>
         )}
-
-        {/* Debug info section - hidden in production */}
-        {process.env.NODE_ENV !== 'production' && (
-          <div className="mt-10 p-4 bg-gray-100 rounded-lg text-xs font-mono whitespace-pre-wrap">
-            <h3 className="font-bold mb-2">Debug Info:</h3>
-            <p>User Embedding: {userEmbedding ? `${userEmbedding.length} dimensions` : 'None'}</p>
-            <p>Product Embeddings: {Object.keys(productEmbeddings).length} loaded</p>
-            <p>Showing Personalized: {showingPersonalized ? 'Yes' : 'No'}</p>
-            <p>Products count: {products.length}</p>
-            {products.length > 0 && showingPersonalized && (
-              <div className="mt-2">
-                <p className="font-bold">Top 3 Matches:</p>
-                {products.slice(0, 3).map((p, i) => (
-                  <p key={i}>{i+1}. {p.name} - {p.similarityScore ? `${(p.similarityScore * 100).toFixed(2)}%` : 'No score'}</p>
-                ))}
-              </div>
-            )}
-            <div className="mt-2">
-              <p className="font-bold">Log:</p>
-              <p>{debugInfo}</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
+  );
+}
+
+// Loading component to show while suspense is resolving
+function ShopPageLoading() {
+  return (
+    <div className="min-h-screen w-full bg-gradient-to-b from-rose-50 to-neutral-50 flex justify-center items-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-500"></div>
+    </div>
+  );
+}
+
+// Export the main page component with Suspense boundary
+export default function ShopPage() {
+  return (
+    <Suspense fallback={<ShopPageLoading />}>
+      <ShopPageContent />
+    </Suspense>
   );
 }

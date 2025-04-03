@@ -218,7 +218,7 @@ export default function QuizPage() {
       setDebugInfo('');
       
       try {
-        // Format the answers into a structure that matches your FastAPI model
+        // Format the answers into a structure that matches FastAPI model
         const formattedAnswers: FormattedAnswers = {
           skin_tone: '',
           under_tone: '',
@@ -335,7 +335,7 @@ export default function QuizPage() {
             
             <h2 className="text-3xl font-bold mb-4 text-gray-900">Thank You! 🎉</h2>
             <p className="text-lg text-gray-700 mb-6">
-              We've analyzed your beauty profile and found your perfect product matches!
+              We&apos;ve analyzed your beauty profile and found your perfect product matches!
             </p>
             
             {isRedirecting ? (
