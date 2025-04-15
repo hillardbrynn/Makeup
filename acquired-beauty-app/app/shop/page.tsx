@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image'; // Import Next.js Image component
 import { 
   Heart, 
   ShoppingBag, 
@@ -321,7 +322,7 @@ function ShopPageContent() {
             
             // Generate embedding from answers
             const timestamp = new Date().getTime();
-            fetch(`http://localhost:8000/generate-embedding?t=${timestamp}`, {
+            fetch(`${process.env.API_LINK}generate-embedding?t=${timestamp}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -428,13 +429,11 @@ function ShopPageContent() {
         });
 
         console.log(`Successfully processed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
-        setDebugInfo(prev => prev + `\nProcessed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
         
         setAllProducts(blushProducts);
         setProductEmbeddings(embeddings);
       } catch (err) {
         console.error('Error fetching data:', err);
-        setDebugInfo(prev => prev + `\nError fetching data: ${err instanceof Error ? err.message : String(err)}`);
         setError('Failed to load products. Please try again.');
       } finally {
         setLoading(false);
@@ -462,7 +461,6 @@ function ShopPageContent() {
       // If we have user embedding and showing personalized results, sort by similarity
       if (userEmbedding && showingPersonalized) {
         console.log("Calculating similarity scores for products");
-        setDebugInfo(prev => prev + "\nCalculating similarity scores");
         
         // Verify user embedding is valid
         if (!Array.isArray(userEmbedding) || userEmbedding.length === 0) {
@@ -859,29 +857,6 @@ function ShopPageContent() {
                 </a>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Debug info section - hidden in production */}
-        {process.env.NODE_ENV !== 'production' && (
-          <div className="mt-10 p-4 bg-gray-100 rounded-lg text-xs font-mono whitespace-pre-wrap">
-            <h3 className="font-bold mb-2">Debug Info:</h3>
-            <p>User Embedding: {userEmbedding ? `${userEmbedding.length} dimensions` : 'None'}</p>
-            <p>Product Embeddings: {Object.keys(productEmbeddings).length} loaded</p>
-            <p>Showing Personalized: {showingPersonalized ? 'Yes' : 'No'}</p>
-            <p>Products count: {products.length}</p>
-            {products.length > 0 && showingPersonalized && (
-              <div className="mt-2">
-                <p className="font-bold">Top 3 Matches:</p>
-                {products.slice(0, 3).map((p, i) => (
-                  <p key={i}>{i+1}. {p.name} - {p.similarityScore ? `${(p.similarityScore * 100).toFixed(2)}%` : 'No score'}</p>
-                ))}
-              </div>
-            )}
-            <div className="mt-2">
-              <p className="font-bold">Log:</p>
-              <p>{debugInfo}</p>
-            </div>
           </div>
         )}
       </div>

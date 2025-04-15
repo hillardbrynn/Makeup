@@ -220,7 +220,7 @@ export default function QuizPage() {
       setDebugInfo('');
       
       try {
-        // Format the answers into a structure that matches your FastAPI model
+        // Format the answers into a structure that matches FastAPI model
         const formattedAnswers: FormattedAnswers = {
           skin_tone: '',
           under_tone: '',
@@ -271,7 +271,7 @@ export default function QuizPage() {
         
         // Send to backend to generate embedding (without storing)
         const timestamp = new Date().getTime();
-        const apiUrl = `http://localhost:8000/generate-embedding?t=${timestamp}`;
+        const apiUrl = `${process.env.API_LINK}generate-embedding?t=${timestamp}`;
         console.log(`Calling API: ${apiUrl}`);
         setDebugInfo(prev => prev + `\nCalling API: ${apiUrl}`);
         
