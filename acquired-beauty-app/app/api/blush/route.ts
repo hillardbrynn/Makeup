@@ -20,7 +20,7 @@ export async function GET() {
     
     // Fetch all blush products
     const { data, error } = await supabase
-      .from('blush')
+      .from('blush_duplicate')
       .select('*')
       .order('id');
     

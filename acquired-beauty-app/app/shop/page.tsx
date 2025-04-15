@@ -79,78 +79,107 @@ export default function ShopPage() {
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
-// Improved cosine similarity function with robust error handling
+  // Replace the cosineSimilarity function with this improved version
+
+  // Improved cosine similarity function with robust error handling
   function cosineSimilarity(vecA: any, vecB: any): number {
-    // Check if both are arrays
-    if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
-      console.error('Invalid vectors', { 
-        vecAType: typeof vecA, 
-        vecBType: typeof vecB,
-        vecA: vecA && typeof vecA === 'object' ? JSON.stringify(vecA).substring(0, 100) : vecA,
-        vecB: vecB && typeof vecB === 'object' ? JSON.stringify(vecB).substring(0, 100) : vecB
-      });
-      
-      // Try to convert to arrays if they're in string format
-      if (typeof vecA === 'string') {
-        try {
-          vecA = JSON.parse(vecA);
-        } catch (e) {
-          console.error('Failed to parse vecA as JSON');
-        }
-      }
-      
-      if (typeof vecB === 'string') {
-        try {
-          vecB = JSON.parse(vecB);
-        } catch (e) {
-          console.error('Failed to parse vecB as JSON');
-        }
-      }
-      
-      // Check again after attempted conversion
+    try {
+      // Check if both are arrays
       if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
+        console.error('Invalid vectors', { 
+          vecAType: typeof vecA, 
+          vecBType: typeof vecB,
+          vecA: vecA && typeof vecA === 'object' ? JSON.stringify(vecA).substring(0, 100) : vecA,
+          vecB: vecB && typeof vecB === 'object' ? JSON.stringify(vecB).substring(0, 100) : vecB
+        });
+        
+        // Try to convert to arrays if they're in string format
+        if (typeof vecA === 'string') {
+          try {
+            vecA = JSON.parse(vecA);
+          } catch (e) {
+            console.error('Failed to parse vecA as JSON');
+          }
+        }
+        
+        if (typeof vecB === 'string') {
+          try {
+            vecB = JSON.parse(vecB);
+          } catch (e) {
+            console.error('Failed to parse vecB as JSON');
+          }
+        }
+        
+        // Check again after attempted conversion
+        if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
+          return 0;
+        }
+      }
+      
+      // Check for empty arrays
+      if (vecA.length === 0 || vecB.length === 0) {
+        console.warn('Empty vector detected');
         return 0;
       }
-    }
-    
-    // Check if dimensions match
-    if (vecA.length !== vecB.length) {
-      console.warn(`Vector length mismatch: vecA=${vecA.length}, vecB=${vecB.length}`);
       
-      // If one is longer, truncate to match the shorter one
-      const minLength = Math.min(vecA.length, vecB.length);
-      vecA = vecA.slice(0, minLength);
-      vecB = vecB.slice(0, minLength);
-      
-      console.log(`Truncated vectors to length ${minLength}`);
-    }
-    
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-    
-    for (let i = 0; i < vecA.length; i++) {
-      // Make sure values are numbers
-      const a = Number(vecA[i]);
-      const b = Number(vecB[i]);
-      
-      if (isNaN(a) || isNaN(b)) {
-        console.error(`Non-numeric values at index ${i}: ${vecA[i]}, ${vecB[i]}`);
-        continue;
+      // Check if dimensions match
+      if (vecA.length !== vecB.length) {
+        console.warn(`Vector length mismatch: vecA=${vecA.length}, vecB=${vecB.length}`);
+        
+        // If one is longer, truncate to match the shorter one
+        const minLength = Math.min(vecA.length, vecB.length);
+        vecA = vecA.slice(0, minLength);
+        vecB = vecB.slice(0, minLength);
+        
+        console.log(`Truncated vectors to length ${minLength}`);
       }
       
-      dotProduct += a * b;
-      normA += a * a;
-      normB += b * b;
-    }
-    
-    if (normA === 0 || normB === 0) {
-      console.warn('Zero norm detected', { normA, normB });
+      let dotProduct = 0;
+      let normA = 0;
+      let normB = 0;
+      let validDimensions = 0;
+      
+      for (let i = 0; i < vecA.length; i++) {
+        // Make sure values are numbers
+        const a = Number(vecA[i]);
+        const b = Number(vecB[i]);
+        
+        if (isNaN(a) || isNaN(b) || !isFinite(a) || !isFinite(b)) {
+          console.error(`Non-numeric or infinite values at index ${i}: ${vecA[i]}, ${vecB[i]}`);
+          continue;
+        }
+        
+        dotProduct += a * b;
+        normA += a * a;
+        normB += b * b;
+        validDimensions++;
+      }
+      
+      // Check if we have any valid dimensions
+      if (validDimensions === 0) {
+        console.warn('No valid dimensions found for similarity calculation');
+        return 0;
+      }
+      
+      if (normA <= 0 || normB <= 0) {
+        console.warn('Zero norm detected', { normA, normB });
+        return 0;
+      }
+      
+      const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+      
+      // Verify the result is valid
+      if (isNaN(similarity) || !isFinite(similarity)) {
+        console.error('Invalid similarity result:', similarity);
+        return 0;
+      }
+      
+      // Clamp to valid range
+      return Math.max(-1, Math.min(1, similarity));
+    } catch (error) {
+      console.error('Error in cosineSimilarity calculation:', error);
       return 0;
     }
-    
-    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    return similarity;
   }
 
   // Add this function to help parse embeddings that might be stored in different formats
@@ -189,78 +218,136 @@ export default function ShopPage() {
   }
   
 
-  // Get embedding from sessionStorage
+  // Replace the useEffect that gets the embedding from sessionStorage
+
   useEffect(() => {
     const getEmbedding = () => {
       try {
         setLoadingEmbedding(true);
         
+        // Get URL parameters
+        const fromQuiz = searchParams?.get('personalized') === 'true';
+        const timestamp = searchParams?.get('t') || 'none';
+        
+        console.log("🔍 DEBUG: Loading embedding from sessionStorage", { 
+          fromQuiz, 
+          timestamp,
+          currentURL: window.location.href
+        });
+        
+        // Clear any debug info
+        setDebugInfo('');
+        
+        // Try to get the embedding from sessionStorage
         const embeddingStr = sessionStorage.getItem('quiz_embedding');
         if (embeddingStr) {
-          const embedding = JSON.parse(embeddingStr);
-          console.log("Found embedding in sessionStorage with length:", embedding.length);
-          setDebugInfo(prev => prev + `\nFound embedding with length: ${embedding.length}`);
-          setUserEmbedding(embedding);
-          setHasQuizData(true);
-          
-          // Automatically enable personalized view if coming from quiz
-          if (comingFromQuiz) {
-            setShowingPersonalized(true);
+          try {
+            const embedding = JSON.parse(embeddingStr);
+            
+            if (!Array.isArray(embedding)) {
+              console.error("🚨 ERROR: Embedding is not an array:", embedding);
+              setDebugInfo(prev => prev + "\n🚨 ERROR: Embedding is not an array");
+              setLoadingEmbedding(false);
+              return;
+            }
+            
+            // Calculate some statistics for the embedding to help with debugging
+            const nonZeroCount = embedding.filter(v => v !== 0).length;
+            const embeddingSum = embedding.reduce((sum, val) => sum + val, 0);
+            const hasNaNs = embedding.some(val => isNaN(val));
+            
+            console.log("✅ Found embedding in sessionStorage:", { 
+              length: embedding.length,
+              nonZeroValues: nonZeroCount,
+              sum: embeddingSum,
+              hasNaNs
+            });
+            
+            // Get profile info if available
+            const profileStr = sessionStorage.getItem('quiz_profile');
+            const profile = profileStr ? JSON.parse(profileStr) : null;
+            
+            setDebugInfo(prev => prev + `\n✅ Found embedding with length: ${embedding.length}, non-zero values: ${nonZeroCount}, sum: ${embeddingSum.toFixed(4)}`);
+            if (profile) {
+              setDebugInfo(prev => prev + `\n👤 Profile: ${profile.summary || JSON.stringify(profile.answers)}`);
+            }
+            
+            // Store the embedding for use in recommendations
+            setUserEmbedding(embedding);
+            setHasQuizData(true);
+            
+            // Enable personalized view if coming from quiz
+            if (fromQuiz) {
+              setShowingPersonalized(true);
+            }
+          } catch (err) {
+            console.error("🚨 Error parsing embedding JSON:", err);
+            setDebugInfo(prev => prev + "\n🚨 Error parsing embedding JSON");
           }
         } else {
-          console.log("No embedding found in sessionStorage");
-          setDebugInfo(prev => prev + "\nNo embedding found in sessionStorage");
+          console.log("⚠️ No embedding found in sessionStorage");
+          setDebugInfo(prev => prev + "\n⚠️ No embedding found in sessionStorage");
           
           // Check for quiz answers as fallback
           const quizAnswers = sessionStorage.getItem('quiz_answers');
           if (quizAnswers) {
-            console.log("Found quiz answers, generating embedding");
-            setDebugInfo(prev => prev + "\nFound quiz answers, generating embedding");
+            console.log("🔄 Found quiz answers, generating embedding");
+            setDebugInfo(prev => prev + "\n🔄 Found quiz answers, generating embedding");
             
             // Generate embedding from answers
-            fetch('http://localhost:8000/generate-embedding', {
+            const timestamp = new Date().getTime();
+            fetch(`http://localhost:8000/generate-embedding?t=${timestamp}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
               },
               body: quizAnswers,
             })
             .then(response => {
               if (!response.ok) {
-                throw new Error('Failed to generate embedding');
+                throw new Error(`Failed to generate embedding: ${response.status}`);
               }
               return response.json();
             })
             .then(data => {
-              if (data.embedding) {
-                console.log("Generated embedding with length:", data.embedding.length);
-                setDebugInfo(prev => prev + `\nGenerated embedding with length: ${data.embedding.length}`);
+              if (data.embedding && Array.isArray(data.embedding)) {
+                console.log("✅ Generated embedding:", {
+                  length: data.embedding.length,
+                  sample: data.embedding.slice(0, 5)
+                });
+                
+                setDebugInfo(prev => prev + `\n✅ Generated new embedding with length: ${data.embedding.length}`);
                 setUserEmbedding(data.embedding);
                 setHasQuizData(true);
                 sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
                 
-                if (comingFromQuiz) {
+                if (fromQuiz) {
                   setShowingPersonalized(true);
                 }
+              } else {
+                console.error("🚨 Invalid embedding received:", data);
+                setDebugInfo(prev => prev + "\n🚨 Invalid embedding received from API");
               }
             })
             .catch(err => {
-              console.error("Error generating embedding:", err);
-              setDebugInfo(prev => prev + `\nError generating embedding: ${err.message}`);
+              console.error("🚨 Error generating embedding:", err);
+              setDebugInfo(prev => prev + `\n🚨 Error generating embedding: ${err.message}`);
             });
           }
         }
         
         setLoadingEmbedding(false);
       } catch (err) {
-        console.error("Error getting embedding:", err);
-        setDebugInfo(prev => prev + `\nError getting embedding: ${err instanceof Error ? err.message : String(err)}`);
+        console.error("🚨 Error getting embedding:", err);
+        setDebugInfo(prev => prev + `\n🚨 Error getting embedding: ${err instanceof Error ? err.message : String(err)}`);
         setLoadingEmbedding(false);
       }
     };
     
+    // Call the function
     getEmbedding();
-  }, [comingFromQuiz]);
+  }, [comingFromQuiz, searchParams]);
 
   // Replace the entire fetch data function with this version:
 
@@ -331,6 +418,8 @@ export default function ShopPage() {
     fetchData();
   }, []);
 
+  // Replace the useEffect that applies filters and sorting (around line 331-390)
+
   // Apply filters and sorting based on user embedding
   useEffect(() => {
     if (!allProducts.length) return;
@@ -346,16 +435,15 @@ export default function ShopPage() {
         );
       }
       
-      // Replace this part in your useEffect that applies filters and sorting
       // If we have user embedding and showing personalized results, sort by similarity
       if (userEmbedding && showingPersonalized) {
         console.log("Calculating similarity scores for products");
         setDebugInfo(prev => prev + "\nCalculating similarity scores");
         
         // Verify user embedding is valid
-        if (!Array.isArray(userEmbedding)) {
-          console.error("User embedding is not an array:", userEmbedding);
-          setDebugInfo(prev => prev + "\nERROR: User embedding is not an array");
+        if (!Array.isArray(userEmbedding) || userEmbedding.length === 0) {
+          console.error("User embedding is not a valid array:", userEmbedding);
+          setDebugInfo(prev => prev + "\nERROR: User embedding is not a valid array");
           setProducts(filteredProducts);
           return;
         }
@@ -365,15 +453,22 @@ export default function ShopPage() {
           const embedding = productEmbeddings[product.id];
           let similarityScore = 0;
           
-          if (embedding) {
+          if (embedding && Array.isArray(embedding) && embedding.length > 0) {
             try {
               similarityScore = cosineSimilarity(embedding, userEmbedding);
+              
+              // Ensure score is valid
+              if (isNaN(similarityScore) || !isFinite(similarityScore)) {
+                console.error(`Invalid similarity score for product ${product.id}:`, similarityScore);
+                similarityScore = 0;
+              }
+              
               console.log(`Product ${product.id} (${product.name}) score: ${similarityScore.toFixed(4)}`);
             } catch (err) {
               console.error(`Error calculating similarity for product ${product.id}:`, err);
             }
           } else {
-            console.log(`No embedding for product ${product.id} (${product.name})`);
+            console.log(`No valid embedding for product ${product.id} (${product.name})`);
           }
           
           return { 
@@ -382,18 +477,16 @@ export default function ShopPage() {
           };
         });
         
-        // Extract scores for debugging
-        const scoreMap = productsWithScore.reduce((map, product) => {
-          map[product.id] = product.similarityScore || 0;
-          return map;
-        }, {} as Record<number, number>);
+        // Log score distribution for debugging
+        const scoreDistribution = {
+          zero: productsWithScore.filter(p => p.similarityScore === 0).length,
+          low: productsWithScore.filter(p => p.similarityScore > 0 && p.similarityScore < 0.3).length,
+          medium: productsWithScore.filter(p => p.similarityScore >= 0.3 && p.similarityScore < 0.7).length,
+          high: productsWithScore.filter(p => p.similarityScore >= 0.7).length
+        };
         
-        console.log("Product scores:", scoreMap);
-        setDebugInfo(prev => prev + `\nProduct scores: ${JSON.stringify(scoreMap)}`);
-        
-        // Log before sorting
-        console.log("Before sorting, first few products:", 
-          productsWithScore.slice(0, 3).map(p => `${p.name}: ${p.similarityScore}`));
+        console.log("Score distribution:", scoreDistribution);
+        setDebugInfo(prev => prev + `\nScore distribution: ${JSON.stringify(scoreDistribution)}`);
         
         // Sort by similarity score (highest first)
         const sortedProducts = [...productsWithScore].sort((a, b) => {
@@ -401,10 +494,6 @@ export default function ShopPage() {
           const scoreB = b.similarityScore || 0;
           return scoreB - scoreA;
         });
-        
-        // Log after sorting
-        console.log("After sorting, first few products:", 
-          sortedProducts.slice(0, 3).map(p => `${p.name}: ${p.similarityScore}`));
         
         setProducts(sortedProducts);
       } else {
@@ -414,6 +503,8 @@ export default function ShopPage() {
     } catch (err) {
       console.error('Error applying filters:', err);
       setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
+      // Fallback to original products if error occurs
+      setProducts(filteredProducts);
     }
   }, [allProducts, searchQuery, userEmbedding, showingPersonalized, productEmbeddings]);
 
@@ -528,7 +619,7 @@ export default function ShopPage() {
           </div>
         </div>
       </header>
-      <div className="h-10 w-full items-center bg-gradient-to-r from-rose-500 to-rose-400 justify-between"></div>
+      {/* <div className="h-10 w-full items-center bg-gradient-to-r from-rose-500 to-rose-400 justify-between"></div> */}
       <div className="relative z-10 container mx-auto px-6 py-10">
         {/* Show "Back to Quiz" button if coming from quiz */}
         {comingFromQuiz && (
@@ -682,15 +773,20 @@ export default function ShopPage() {
                     </button>
                     
                     {/* Match score indicator - show more prominently if coming from quiz */}
-                    {(showingPersonalized || comingFromQuiz) && product.similarityScore && product.similarityScore > 0 && (
+                    {(showingPersonalized || comingFromQuiz) && product.similarityScore !== undefined && (
                       <div className={`
                         absolute bottom-3 left-3 px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm
-                        ${comingFromQuiz 
-                          ? 'bg-rose-500 text-white' 
-                          : 'bg-white/90 text-rose-500'}
-                      `}>
-                        <Sparkles size={12} className={comingFromQuiz ? "text-yellow-300" : ""} />
-                        {Math.round(product.similarityScore * 100)}% Match
+                        ${product.similarityScore > 0.01 
+                          ? comingFromQuiz 
+                            ? 'bg-rose-500 text-white' 
+                            : 'bg-white/90 text-rose-500'
+                          : 'bg-gray-300 text-gray-700'
+                        }`}
+                      >
+                        <Sparkles size={12} className={product.similarityScore > 0.01 && comingFromQuiz ? "text-yellow-300" : ""} />
+                        {product.similarityScore > 0.01 
+                          ? `${Math.round(product.similarityScore * 100)}% Match` 
+                          : 'No Match'}
                       </div>
                     )}
                   </div>
