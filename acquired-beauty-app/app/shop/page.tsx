@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import Image from "next/image"; // Import Next.js Image component
-import {
-  Heart,
-  ShoppingBag,
-  Search,
-  Star,
+import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+// import Image from 'next/image'; // Import Next.js Image component
+import { 
+  Heart, 
+  ShoppingBag, 
+  Search, 
+  Star, 
   Sparkles,
   Menu,
   ArrowLeft,
@@ -54,11 +54,9 @@ interface BlushEmbedding {
   embedding: number[] | string | Record<string, number>;
 }
 
-// Main shop component that uses client-side features
+// Create a client component for the content that uses useSearchParams
 function ShopPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const comingFromQuiz = searchParams?.get("personalized") === "true";
 
   const [products, setProducts] = useState<BlushProduct[]>([]);
   const [allProducts, setAllProducts] = useState<BlushProduct[]>([]);
@@ -69,18 +67,79 @@ function ShopPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [userEmbedding, setUserEmbedding] = useState<number[] | null>(null);
-  const [showingPersonalized, setShowingPersonalized] =
-    useState<boolean>(comingFromQuiz);
+
+  const [showingPersonalized, setShowingPersonalized] = useState<boolean>(false);
   const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
-  // We'll keep this commented out since it's not being used
-  const [, setDebugInfo] = useState<string>("");
+  // const [debugInfo, setDebugInfo] = useState<string>('');
+  const [comingFromQuiz, setComingFromQuiz] = useState<boolean>(false);
+  
+  // Initialize client-side values that depend on window/sessionStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Set up URL params
+      const searchParams = new URLSearchParams(window.location.search);
+      const isFromQuiz = searchParams.get('personalized') === 'true';
+      setComingFromQuiz(isFromQuiz);
+      setShowingPersonalized(isFromQuiz);
+    }
+  }, []);
+  
+  // This function can be useful if you need to proxy external images
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+  const getProxiedImageUrl = (originalUrl?: string): string => {
+    if (!originalUrl) return "/placeholder-product.png";
+    return `/api/image?url=${encodeURIComponent(originalUrl)}`;
+  };
 
-  // Replace the cosineSimilarity function with this improved version
+  // Helper function to calculate the actual similarity once we know the arrays are valid
+  const calculateSimilarity = useCallback((vecA: number[], vecB: number[]): number => {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    let validDimensions = 0;
+    
+    for (let i = 0; i < vecA.length; i++) {
+      // Make sure values are numbers
+      const a = Number(vecA[i]);
+      const b = Number(vecB[i]);
+      
+      if (isNaN(a) || isNaN(b) || !isFinite(a) || !isFinite(b)) {
+        console.error(`Non-numeric or infinite values at index ${i}: ${vecA[i]}, ${vecB[i]}`);
+        continue;
+      }
+      
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
+      validDimensions++;
+    }
+    
+    // Check if we have any valid dimensions
+    if (validDimensions === 0) {
+      console.warn('No valid dimensions found for similarity calculation');
+      return 0;
+    }
+    
+    if (normA <= 0 || normB <= 0) {
+      console.warn('Zero norm detected', { normA, normB });
+      return 0;
+    }
+    
+    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    
+    // Verify the result is valid
+    if (isNaN(similarity) || !isFinite(similarity)) {
+      console.error('Invalid similarity result:', similarity);
+      return 0;
+    }
+    
+    // Clamp to valid range
+    return Math.max(-1, Math.min(1, similarity));
+  }, []);
 
   // Improved cosine similarity function with robust error handling
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function cosineSimilarity(vecA: any, vecB: any): number {
+  const cosineSimilarity = useCallback((vecA: number[] | unknown, vecB: number[] | unknown): number => {
     try {
       // Check if both are arrays
       if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
@@ -102,7 +161,7 @@ function ShopPageContent() {
           try {
             vecA = JSON.parse(vecA);
           } catch {
-            console.error("Failed to parse vecA as JSON");
+            console.error('Failed to parse vecA as JSON');
           }
         }
 
@@ -110,7 +169,7 @@ function ShopPageContent() {
           try {
             vecB = JSON.parse(vecB);
           } catch {
-            console.error("Failed to parse vecB as JSON");
+            console.error('Failed to parse vecB as JSON');
           }
         }
 
@@ -119,81 +178,43 @@ function ShopPageContent() {
           return 0;
         }
       }
-
+      
+      // At this point we know vecA and vecB are arrays
+      const vecArrayA = vecA as number[];
+      const vecArrayB = vecB as number[];
+      
       // Check for empty arrays
-      if (vecA.length === 0 || vecB.length === 0) {
-        console.warn("Empty vector detected");
+      if (vecArrayA.length === 0 || vecArrayB.length === 0) {
+        console.warn('Empty vector detected');
         return 0;
       }
 
       // Check if dimensions match
-      if (vecA.length !== vecB.length) {
-        console.warn(
-          `Vector length mismatch: vecA=${vecA.length}, vecB=${vecB.length}`
-        );
-
+      if (vecArrayA.length !== vecArrayB.length) {
+        console.warn(`Vector length mismatch: vecA=${vecArrayA.length}, vecB=${vecArrayB.length}`);
+        
         // If one is longer, truncate to match the shorter one
-        const minLength = Math.min(vecA.length, vecB.length);
-        vecA = vecA.slice(0, minLength);
-        vecB = vecB.slice(0, minLength);
-
+        const minLength = Math.min(vecArrayA.length, vecArrayB.length);
+        const vecATruncated = vecArrayA.slice(0, minLength);
+        const vecBTruncated = vecArrayB.slice(0, minLength);
+        
         console.log(`Truncated vectors to length ${minLength}`);
+        
+        // Now use the truncated arrays
+        return calculateSimilarity(vecATruncated, vecBTruncated);
       }
-
-      let dotProduct = 0;
-      let normA = 0;
-      let normB = 0;
-      let validDimensions = 0;
-
-      for (let i = 0; i < vecA.length; i++) {
-        // Make sure values are numbers
-        const a = Number(vecA[i]);
-        const b = Number(vecB[i]);
-
-        if (isNaN(a) || isNaN(b) || !isFinite(a) || !isFinite(b)) {
-          console.error(
-            `Non-numeric or infinite values at index ${i}: ${vecA[i]}, ${vecB[i]}`
-          );
-          continue;
-        }
-
-        dotProduct += a * b;
-        normA += a * a;
-        normB += b * b;
-        validDimensions++;
-      }
-
-      // Check if we have any valid dimensions
-      if (validDimensions === 0) {
-        console.warn("No valid dimensions found for similarity calculation");
-        return 0;
-      }
-
-      if (normA <= 0 || normB <= 0) {
-        console.warn("Zero norm detected", { normA, normB });
-        return 0;
-      }
-
-      const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-
-      // Verify the result is valid
-      if (isNaN(similarity) || !isFinite(similarity)) {
-        console.error("Invalid similarity result:", similarity);
-        return 0;
-      }
-
-      // Clamp to valid range
-      return Math.max(-1, Math.min(1, similarity));
+      
+      // If dimensions match, calculate similarity
+      return calculateSimilarity(vecArrayA, vecArrayB);
+      
     } catch (error) {
       console.error("Error in cosineSimilarity calculation:", error);
       return 0;
     }
-  }
+  }, [calculateSimilarity]);
 
   // Add this function to help parse embeddings that might be stored in different formats
-  function parseEmbedding(
-    embedding: number[] | string | Record<string, number>
-  ): number[] {
+  const parseEmbedding = useCallback((embedding: unknown): number[] => {
     if (Array.isArray(embedding)) {
       return embedding;
     }
@@ -214,7 +235,7 @@ function ShopPageContent() {
       // It might be a Postgres array type returned from Supabase
       // Let's try to extract the values
       try {
-        const values = Object.values(embedding);
+        const values = Object.values(embedding as Record<string, number>);
         if (values.length > 0 && !isNaN(Number(values[0]))) {
           return values.map((v) => Number(v));
         }
@@ -228,28 +249,31 @@ function ShopPageContent() {
 
     console.error("Could not parse embedding", embedding);
     return [];
-  }
+  }, []);
+  
 
   // Replace the useEffect that gets the embedding from sessionStorage
-
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const getEmbedding = () => {
       try {
         setLoadingEmbedding(true);
 
         // Get URL parameters
-        const fromQuiz = searchParams?.get("personalized") === "true";
-        const timestamp = searchParams?.get("t") || "none";
-
-        console.log("🔍 DEBUG: Loading embedding from sessionStorage", {
-          fromQuiz,
+        const searchParams = new URLSearchParams(window.location.search);
+        const fromQuiz = searchParams.get('personalized') === 'true';
+        const timestamp = searchParams.get('t') || 'none';
+        
+        console.log("🔍 DEBUG: Loading embedding from sessionStorage", { 
+          fromQuiz, 
           timestamp,
           currentURL: window.location.href,
         });
 
         // Clear any debug info
-        setDebugInfo("");
-
+        // setDebugInfo('');
+        
         // Try to get the embedding from sessionStorage
         const embeddingStr = sessionStorage.getItem("quiz_embedding");
         if (embeddingStr) {
@@ -258,9 +282,7 @@ function ShopPageContent() {
 
             if (!Array.isArray(embedding)) {
               console.error("🚨 ERROR: Embedding is not an array:", embedding);
-              setDebugInfo(
-                (prev) => prev + "\n🚨 ERROR: Embedding is not an array"
-              );
+              // setDebugInfo(prev => prev + "\n🚨 ERROR: Embedding is not an array");
               setLoadingEmbedding(false);
               return;
             }
@@ -278,28 +300,13 @@ function ShopPageContent() {
             });
 
             // Get profile info if available
-            const profileStr = sessionStorage.getItem("quiz_profile");
-            const profile = profileStr ? JSON.parse(profileStr) : null;
-
-            setDebugInfo(
-              (prev) =>
-                prev +
-                `\n✅ Found embedding with length: ${
-                  embedding.length
-                }, non-zero values: ${nonZeroCount}, sum: ${embeddingSum.toFixed(
-                  4
-                )}`
-            );
-            if (profile) {
-              setDebugInfo(
-                (prev) =>
-                  prev +
-                  `\n👤 Profile: ${
-                    profile.summary || JSON.stringify(profile.answers)
-                  }`
-              );
-            }
-
+            // const profileStr = sessionStorage.getItem('quiz_profile');
+            // const profile = profileStr ? JSON.parse(profileStr) : null;
+            
+            // setDebugInfo(prev => prev + `\n✅ Found embedding with length: ${embedding.length}, non-zero values: ${nonZeroCount}, sum: ${embeddingSum.toFixed(4)}`);
+            // if (profile) {
+            //   setDebugInfo(prev => prev + `\n👤 Profile: ${profile.summary || JSON.stringify(profile.answers)}`);
+            // }
             // Store the embedding for use in recommendations
             setUserEmbedding(embedding);
             setHasQuizData(true);
@@ -310,22 +317,18 @@ function ShopPageContent() {
             }
           } catch (err) {
             console.error("🚨 Error parsing embedding JSON:", err);
-            setDebugInfo((prev) => prev + "\n🚨 Error parsing embedding JSON");
+            // setDebugInfo(prev => prev + "\n🚨 Error parsing embedding JSON");
           }
         } else {
           console.log("⚠️ No embedding found in sessionStorage");
-          setDebugInfo(
-            (prev) => prev + "\n⚠️ No embedding found in sessionStorage"
-          );
-
+          // setDebugInfo(prev => prev + "\n⚠️ No embedding found in sessionStorage");
+          
           // Check for quiz answers as fallback
           const quizAnswers = sessionStorage.getItem("quiz_answers");
           if (quizAnswers) {
             console.log("🔄 Found quiz answers, generating embedding");
-            setDebugInfo(
-              (prev) => prev + "\n🔄 Found quiz answers, generating embedding"
-            );
-
+            // setDebugInfo(prev => prev + "\n🔄 Found quiz answers, generating embedding");
+            
             // Generate embedding from answers
             const timestamp = new Date().getTime();
             fetch(`${process.env.API_LINK}generate-embedding?t=${timestamp}`, {
@@ -336,75 +339,56 @@ function ShopPageContent() {
               },
               body: quizAnswers,
             })
-              .then((response) => {
-                if (!response.ok) {
-                  throw new Error(
-                    `Failed to generate embedding: ${response.status}`
-                  );
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Failed to generate embedding: ${response.status}`);
+              }
+              return response.json();
+            })
+            .then(data => {
+              if (data.embedding && Array.isArray(data.embedding)) {
+                console.log("✅ Generated embedding:", {
+                  length: data.embedding.length,
+                  sample: data.embedding.slice(0, 5)
+                });
+                
+                // setDebugInfo(prev => prev + `\n✅ Generated new embedding with length: ${data.embedding.length}`);
+                setUserEmbedding(data.embedding);
+                setHasQuizData(true);
+                sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
+                
+                if (fromQuiz) {
+                  setShowingPersonalized(true);
                 }
-                return response.json();
-              })
-              .then((data) => {
-                if (data.embedding && Array.isArray(data.embedding)) {
-                  console.log("✅ Generated embedding:", {
-                    length: data.embedding.length,
-                    sample: data.embedding.slice(0, 5),
-                  });
-
-                  setDebugInfo(
-                    (prev) =>
-                      prev +
-                      `\n✅ Generated new embedding with length: ${data.embedding.length}`
-                  );
-                  setUserEmbedding(data.embedding);
-                  setHasQuizData(true);
-                  sessionStorage.setItem(
-                    "quiz_embedding",
-                    JSON.stringify(data.embedding)
-                  );
-
-                  if (fromQuiz) {
-                    setShowingPersonalized(true);
-                  }
-                } else {
-                  console.error("🚨 Invalid embedding received:", data);
-                  setDebugInfo(
-                    (prev) => prev + "\n🚨 Invalid embedding received from API"
-                  );
-                }
-              })
-              .catch((err) => {
-                console.error("🚨 Error generating embedding:", err);
-                setDebugInfo(
-                  (prev) =>
-                    prev + `\n🚨 Error generating embedding: ${err.message}`
-                );
-              });
+              } else {
+                console.error("🚨 Invalid embedding received:", data);
+                // setDebugInfo(prev => prev + "\n🚨 Invalid embedding received from API");
+              }
+            })
+            .catch(err => {
+              console.error("🚨 Error generating embedding:", err);
+              // setDebugInfo(prev => prev + `\n🚨 Error generating embedding: ${err.message}`);
+            });
           }
         }
 
         setLoadingEmbedding(false);
       } catch (err) {
         console.error("🚨 Error getting embedding:", err);
-        setDebugInfo(
-          (prev) =>
-            prev +
-            `\n🚨 Error getting embedding: ${
-              err instanceof Error ? err.message : String(err)
-            }`
-        );
+        // setDebugInfo(prev => prev + `\n🚨 Error getting embedding: ${err instanceof Error ? err.message : String(err)}`);
         setLoadingEmbedding(false);
       }
     };
 
     // Call the function
     getEmbedding();
-  }, [comingFromQuiz, searchParams]);
-
-  // Replace the entire fetch data function with this version:
+  }, []); // No dependencies, run once after mount on client side
 
   // Fetch blush products and embeddings
   useEffect(() => {
+    // Don't run this effect during server-side rendering
+    if (typeof window === 'undefined') return;
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -477,9 +461,7 @@ function ShopPageContent() {
     };
 
     fetchData();
-  }, []);
-
-  // Replace the useEffect that applies filters and sorting (around line 331-390)
+  }, [parseEmbedding]);
 
   // Apply filters and sorting based on user embedding
   useEffect(() => {
@@ -504,9 +486,7 @@ function ShopPageContent() {
         // Verify user embedding is valid
         if (!Array.isArray(userEmbedding) || userEmbedding.length === 0) {
           console.error("User embedding is not a valid array:", userEmbedding);
-          setDebugInfo(
-            (prev) => prev + "\nERROR: User embedding is not a valid array"
-          );
+          // setDebugInfo(prev => prev + "\nERROR: User embedding is not a valid array");
           setProducts(filteredProducts);
           return;
         }
@@ -566,11 +546,8 @@ function ShopPageContent() {
         };
 
         console.log("Score distribution:", scoreDistribution);
-        setDebugInfo(
-          (prev) =>
-            prev + `\nScore distribution: ${JSON.stringify(scoreDistribution)}`
-        );
-
+        // setDebugInfo(prev => prev + `\nScore distribution: ${JSON.stringify(scoreDistribution)}`);
+        
         // Sort by similarity score (highest first)
         const sortedProducts = [...productsWithScore].sort((a, b) => {
           const scoreA = a.similarityScore || 0;
@@ -584,24 +561,12 @@ function ShopPageContent() {
         setProducts(filteredProducts);
       }
     } catch (err) {
-      console.error("Error applying filters:", err);
-      setDebugInfo(
-        (prev) =>
-          prev +
-          `\nError applying filters: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-      );
+      console.error('Error applying filters:', err);
+      // setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
       // Fallback to original products if error occurs
-      setProducts(filteredProducts);
+      setProducts(allProducts);
     }
-  }, [
-    allProducts,
-    searchQuery,
-    userEmbedding,
-    showingPersonalized,
-    productEmbeddings,
-  ]);
+  }, [allProducts, searchQuery, userEmbedding, showingPersonalized, productEmbeddings, cosineSimilarity]);
 
   const handleSearch = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -726,10 +691,10 @@ function ShopPageContent() {
           </div>
         </div>
       </header>
-      {/* <div className="h-10 w-full items-center bg-gradient-to-r from-rose-500 to-rose-400 justify-between"></div> */}
+      
       <div className="relative z-10 container mx-auto px-6 py-10">
-        {/* Show "Back to Quiz" button if coming from quiz */}
-        {comingFromQuiz && (
+        {/* Only render this on client-side to prevent hydration mismatch */}
+        {typeof window !== 'undefined' && comingFromQuiz && (
           <div className="mb-6">
             <Button
               variant="outline"
@@ -744,17 +709,21 @@ function ShopPageContent() {
 
         {/* Header */}
         <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">
-            Blush Collection
-          </h1>
-
-          {/* Show personalized message if coming from quiz */}
-          {comingFromQuiz ? (
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Here are your personalized blush recommendations based on your
-              beauty quiz results!
-            </p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Blush Collection</h1>
+          
+          {/* Show personalized message if coming from quiz, but only on client */}
+          {typeof window !== 'undefined' ? (
+            comingFromQuiz ? (
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Here are your personalized blush recommendations based on your beauty quiz results!
+              </p>
+            ) : (
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Discover perfect blush products curated just for your skin tone and preferences.
+              </p>
+            )
           ) : (
+            // Default text for server-side rendering
             <p className="text-gray-600 max-w-2xl mx-auto">
               Discover perfect blush products curated just for your skin tone
               and preferences.
@@ -873,17 +842,14 @@ function ShopPageContent() {
                   <div className="relative h-56 bg-gray-100">
                     {product.image ? (
                       <div className="relative w-full h-full">
-                        <Image
+                        {/* Using regular img tag to avoid Next.js image domain configuration issues */}
+                        <img
                           src={product.image}
                           alt={product.name || "Blush Product"}
-                          fill
-                          className="object-cover"
-                          onError={() => {
-                            console.error(
-                              `Error loading image for ${product.name}`
-                            );
-                            // Note: We can't directly modify src in Next.js Image component on error
-                            // This would require a state to track failed images
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/placeholder-product.png";
                           }}
                         />
                       </div>
@@ -998,19 +964,14 @@ function ShopPageContent() {
   );
 }
 
-// Loading component to show while suspense is resolving
-function ShopPageLoading() {
-  return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-rose-50 to-neutral-50 flex justify-center items-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-500"></div>
-    </div>
-  );
-}
-
-// Export the main page component with Suspense boundary
+// Main page component that wraps the content with Suspense
 export default function ShopPage() {
   return (
-    <Suspense fallback={<ShopPageLoading />}>
+    <Suspense fallback={
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-rose-500"></div>
+      </div>
+    }>
       <ShopPageContent />
     </Suspense>
   );

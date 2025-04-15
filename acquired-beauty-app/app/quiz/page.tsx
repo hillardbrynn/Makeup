@@ -40,8 +40,8 @@ const quizQuestions: QuizQuestion[] = [
   },
   {
     id: 2,
-    question: "What's your undertone vibe? 💖",
-    subtext: "Take a peek at your wrist—are your veins more blue or green? That's a hint!",
+    question: "What&apos;s your undertone vibe? 💖",
+    subtext: "Take a peek at your wrist—are your veins more blue or green? That&apos;s a hint!",
     options: [
       { id: 'cool', label: 'Cool', description: 'Blue or purple veins, silver jewelry looks best' },
       { id: 'warm', label: 'Warm', description: 'Green veins, gold jewelry looks best' },
@@ -60,7 +60,7 @@ const quizQuestions: QuizQuestion[] = [
   },
   {
     id: 4,
-    question: "Alright, spill the tea—what's your skin type? 🧴",
+    question: "Alright, spill the tea—what&apos;s your skin type? 🧴",
     subtext: "This helps us recommend formulas that actually vibe with your skin.",
     options: [
       { id: 'oily', label: 'Oily', description: 'Shiny throughout the day' },
@@ -72,7 +72,7 @@ const quizQuestions: QuizQuestion[] = [
   {
     id: 5,
     question: "What are your main skin concerns? (Feel free to select all that apply!) ✨",
-    subtext: "We've got you—this helps us recommend products that work for you.",
+    subtext: "We&apos;ve got you—this helps us recommend products that work for you.",
     multiSelect: true,
     options: [
       { id: 'acne', label: 'Acne', description: 'Breakouts and blemishes' },
@@ -85,7 +85,7 @@ const quizQuestions: QuizQuestion[] = [
   },
   {
     id: 6,
-    question: "What's your go-to lip product? 💋",
+    question: "What&apos;s your go-to lip product? 💋",
     subtext: "Choose the one that you reach for the most!",
     options: [
       { id: 'lipstick', label: 'Lipstick', description: 'Classic and bold' },
@@ -96,7 +96,7 @@ const quizQuestions: QuizQuestion[] = [
   },
   {
     id: 7,
-    question: "What's your eye color? 👀",
+    question: "What&apos;s your eye color? 👀",
     subtext: "This helps us suggest shades that make your eyes pop!",
     options: [
       { id: 'brown', label: 'Brown', description: 'Warm and rich' },
@@ -108,7 +108,7 @@ const quizQuestions: QuizQuestion[] = [
   },
   {
     id: 8,
-    question: "What's your makeup vibe? 💄",
+    question: "What&apos;s your makeup vibe? 💄",
     subtext: "Choose the style that fits your aesthetic the most!",
     options: [
       { id: 'natural', label: 'Natural', description: 'Simple and fresh-faced' },
@@ -341,7 +341,11 @@ export default function QuizPage() {
             setDebugInfo(prev => prev + `\nVerified embedding in storage: length=${parsed.length}`);
           } catch (err) {
             console.error('Error parsing stored embedding:', err);
-            setDebugInfo(prev => prev + `\nError verifying stored embedding: ${err.message}`);
+            if (err instanceof Error) {
+              setDebugInfo(prev => prev + `\nError verifying stored embedding: ${err.message}`);
+            } else {
+              setDebugInfo(prev => prev + `\nError verifying stored embedding: ${String(err)}`);
+            }
           }
         }
         
