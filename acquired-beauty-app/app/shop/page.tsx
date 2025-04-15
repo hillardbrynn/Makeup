@@ -11,8 +11,8 @@ import {
   Star, 
   Sparkles,
   Menu,
-  ArrowLeft
-} from 'lucide-react';
+  ArrowLeft,
+} from "lucide-react";
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -28,7 +28,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import Link from 'next/link';
+import Link from "next/link";
 
 // Define TypeScript interfaces
 interface BlushProduct {
@@ -57,15 +57,17 @@ interface BlushEmbedding {
 // Create a client component for the content that uses useSearchParams
 function ShopPageContent() {
   const router = useRouter();
-  
-  // State variables
+
   const [products, setProducts] = useState<BlushProduct[]>([]);
   const [allProducts, setAllProducts] = useState<BlushProduct[]>([]);
-  const [productEmbeddings, setProductEmbeddings] = useState<Record<number, number[]>>({});
+  const [productEmbeddings, setProductEmbeddings] = useState<
+    Record<number, number[]>
+  >({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [userEmbedding, setUserEmbedding] = useState<number[] | null>(null);
+
   const [showingPersonalized, setShowingPersonalized] = useState<boolean>(false);
   const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
@@ -141,30 +143,36 @@ function ShopPageContent() {
     try {
       // Check if both are arrays
       if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
-        console.error('Invalid vectors', { 
-          vecAType: typeof vecA, 
+        console.error("Invalid vectors", {
+          vecAType: typeof vecA,
           vecBType: typeof vecB,
-          vecA: vecA && typeof vecA === 'object' ? JSON.stringify(vecA).substring(0, 100) : vecA,
-          vecB: vecB && typeof vecB === 'object' ? JSON.stringify(vecB).substring(0, 100) : vecB
+          vecA:
+            vecA && typeof vecA === "object"
+              ? JSON.stringify(vecA).substring(0, 100)
+              : vecA,
+          vecB:
+            vecB && typeof vecB === "object"
+              ? JSON.stringify(vecB).substring(0, 100)
+              : vecB,
         });
-        
+
         // Try to convert to arrays if they're in string format
-        if (typeof vecA === 'string') {
+        if (typeof vecA === "string") {
           try {
             vecA = JSON.parse(vecA);
           } catch {
             console.error('Failed to parse vecA as JSON');
           }
         }
-        
-        if (typeof vecB === 'string') {
+
+        if (typeof vecB === "string") {
           try {
             vecB = JSON.parse(vecB);
           } catch {
             console.error('Failed to parse vecB as JSON');
           }
         }
-        
+
         // Check again after attempted conversion
         if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
           return 0;
@@ -180,7 +188,7 @@ function ShopPageContent() {
         console.warn('Empty vector detected');
         return 0;
       }
-      
+
       // Check if dimensions match
       if (vecArrayA.length !== vecArrayB.length) {
         console.warn(`Vector length mismatch: vecA=${vecArrayA.length}, vecB=${vecArrayB.length}`);
@@ -200,7 +208,7 @@ function ShopPageContent() {
       return calculateSimilarity(vecArrayA, vecArrayB);
       
     } catch (error) {
-      console.error('Error in cosineSimilarity calculation:', error);
+      console.error("Error in cosineSimilarity calculation:", error);
       return 0;
     }
   }, [calculateSimilarity]);
@@ -210,8 +218,8 @@ function ShopPageContent() {
     if (Array.isArray(embedding)) {
       return embedding;
     }
-    
-    if (typeof embedding === 'string') {
+
+    if (typeof embedding === "string") {
       try {
         // Try to parse as JSON
         const parsed = JSON.parse(embedding);
@@ -219,24 +227,27 @@ function ShopPageContent() {
           return parsed;
         }
       } catch {
-        console.error('Failed to parse embedding as JSON string', embedding);
+        console.error("Failed to parse embedding as JSON string", embedding);
       }
     }
-    
-    if (embedding && typeof embedding === 'object') {
+
+    if (embedding && typeof embedding === "object") {
       // It might be a Postgres array type returned from Supabase
       // Let's try to extract the values
       try {
         const values = Object.values(embedding as Record<string, number>);
         if (values.length > 0 && !isNaN(Number(values[0]))) {
-          return values.map(v => Number(v));
+          return values.map((v) => Number(v));
         }
       } catch {
-        console.error('Failed to extract values from embedding object', embedding);
+        console.error(
+          "Failed to extract values from embedding object",
+          embedding
+        );
       }
     }
-    
-    console.error('Could not parse embedding', embedding);
+
+    console.error("Could not parse embedding", embedding);
     return [];
   }, []);
   
@@ -248,7 +259,7 @@ function ShopPageContent() {
     const getEmbedding = () => {
       try {
         setLoadingEmbedding(true);
-        
+
         // Get URL parameters
         const searchParams = new URLSearchParams(window.location.search);
         const fromQuiz = searchParams.get('personalized') === 'true';
@@ -257,37 +268,37 @@ function ShopPageContent() {
         console.log("🔍 DEBUG: Loading embedding from sessionStorage", { 
           fromQuiz, 
           timestamp,
-          currentURL: window.location.href
+          currentURL: window.location.href,
         });
-        
+
         // Clear any debug info
         // setDebugInfo('');
         
         // Try to get the embedding from sessionStorage
-        const embeddingStr = sessionStorage.getItem('quiz_embedding');
+        const embeddingStr = sessionStorage.getItem("quiz_embedding");
         if (embeddingStr) {
           try {
             const embedding = JSON.parse(embeddingStr);
-            
+
             if (!Array.isArray(embedding)) {
               console.error("🚨 ERROR: Embedding is not an array:", embedding);
               // setDebugInfo(prev => prev + "\n🚨 ERROR: Embedding is not an array");
               setLoadingEmbedding(false);
               return;
             }
-            
+
             // Calculate some statistics for the embedding to help with debugging
-            const nonZeroCount = embedding.filter(v => v !== 0).length;
+            const nonZeroCount = embedding.filter((v) => v !== 0).length;
             const embeddingSum = embedding.reduce((sum, val) => sum + val, 0);
-            const hasNaNs = embedding.some(val => isNaN(val));
-            
-            console.log("✅ Found embedding in sessionStorage:", { 
+            const hasNaNs = embedding.some((val) => isNaN(val));
+
+            console.log("✅ Found embedding in sessionStorage:", {
               length: embedding.length,
               nonZeroValues: nonZeroCount,
               sum: embeddingSum,
-              hasNaNs
+              hasNaNs,
             });
-            
+
             // Get profile info if available
             // const profileStr = sessionStorage.getItem('quiz_profile');
             // const profile = profileStr ? JSON.parse(profileStr) : null;
@@ -296,11 +307,10 @@ function ShopPageContent() {
             // if (profile) {
             //   setDebugInfo(prev => prev + `\n👤 Profile: ${profile.summary || JSON.stringify(profile.answers)}`);
             // }
-            
             // Store the embedding for use in recommendations
             setUserEmbedding(embedding);
             setHasQuizData(true);
-            
+
             // Enable personalized view if coming from quiz
             if (fromQuiz) {
               setShowingPersonalized(true);
@@ -314,7 +324,7 @@ function ShopPageContent() {
           // setDebugInfo(prev => prev + "\n⚠️ No embedding found in sessionStorage");
           
           // Check for quiz answers as fallback
-          const quizAnswers = sessionStorage.getItem('quiz_answers');
+          const quizAnswers = sessionStorage.getItem("quiz_answers");
           if (quizAnswers) {
             console.log("🔄 Found quiz answers, generating embedding");
             // setDebugInfo(prev => prev + "\n🔄 Found quiz answers, generating embedding");
@@ -322,10 +332,10 @@ function ShopPageContent() {
             // Generate embedding from answers
             const timestamp = new Date().getTime();
             fetch(`${process.env.API_LINK}generate-embedding?t=${timestamp}`, {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache'
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache",
               },
               body: quizAnswers,
             })
@@ -361,7 +371,7 @@ function ShopPageContent() {
             });
           }
         }
-        
+
         setLoadingEmbedding(false);
       } catch (err) {
         console.error("🚨 Error getting embedding:", err);
@@ -369,7 +379,7 @@ function ShopPageContent() {
         setLoadingEmbedding(false);
       }
     };
-    
+
     // Call the function
     getEmbedding();
   }, []); // No dependencies, run once after mount on client side
@@ -382,18 +392,18 @@ function ShopPageContent() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch products from Supabase
-        const productsResponse = await fetch('/api/blush');
+        const productsResponse = await fetch("/api/blush");
         if (!productsResponse.ok) {
-          throw new Error('Failed to fetch blush products');
+          throw new Error("Failed to fetch blush products");
         }
         const blushProducts = await productsResponse.json();
-        
+
         // Fetch embeddings from Supabase
-        const embeddingsResponse = await fetch('/api/blush-embeddings');
+        const embeddingsResponse = await fetch("/api/blush-embeddings");
         if (!embeddingsResponse.ok) {
-          throw new Error('Failed to fetch blush embeddings');
+          throw new Error("Failed to fetch blush embeddings");
         }
         const blushEmbeddings = await embeddingsResponse.json();
 
@@ -404,10 +414,12 @@ function ShopPageContent() {
         // Debug the structure of the first embedding to understand its format
         if (blushEmbeddings.length > 0) {
           const firstEmbedding = blushEmbeddings[0];
-          console.log('First product embedding structure:', {
+          console.log("First product embedding structure:", {
             blush_id: firstEmbedding.blush_id,
             embedding_type: typeof firstEmbedding.embedding,
-            embedding_sample: JSON.stringify(firstEmbedding.embedding).substring(0, 100) + '...'
+            embedding_sample:
+              JSON.stringify(firstEmbedding.embedding).substring(0, 100) +
+              "...",
           });
         }
 
@@ -417,50 +429,60 @@ function ShopPageContent() {
             const parsedEmbedding = parseEmbedding(item.embedding);
             if (parsedEmbedding.length > 0) {
               embeddings[item.blush_id] = parsedEmbedding;
-              console.log(`Processed embedding for product ${item.blush_id}: length = ${parsedEmbedding.length}`);
+              console.log(
+                `Processed embedding for product ${item.blush_id}: length = ${parsedEmbedding.length}`
+              );
             } else {
               embeddingParseErrors++;
             }
           } catch (err) {
-            console.error(`Error parsing embedding for product ${item.blush_id}:`, err);
+            console.error(
+              `Error parsing embedding for product ${item.blush_id}:`,
+              err
+            );
             embeddingParseErrors++;
           }
         });
 
-        console.log(`Successfully processed ${Object.keys(embeddings).length} embeddings with ${embeddingParseErrors} errors`);
-        
+        console.log(
+          `Successfully processed ${
+            Object.keys(embeddings).length
+          } embeddings with ${embeddingParseErrors} errors`
+        );
+
         setAllProducts(blushProducts);
         setProductEmbeddings(embeddings);
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load products. Please try again.');
+        console.error("Error fetching data:", err);
+        setError("Failed to load products. Please try again.");
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, [parseEmbedding]);
 
   // Apply filters and sorting based on user embedding
   useEffect(() => {
     if (!allProducts.length) return;
-    
+
     try {
       // Apply search filter
       let filteredProducts = [...allProducts];
-      
+
       if (searchQuery) {
-        filteredProducts = filteredProducts.filter(product => 
-          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.brand.toLowerCase().includes(searchQuery.toLowerCase())
+        filteredProducts = filteredProducts.filter(
+          (product) =>
+            product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            product.brand.toLowerCase().includes(searchQuery.toLowerCase())
         );
       }
-      
+
       // If we have user embedding and showing personalized results, sort by similarity
       if (userEmbedding && showingPersonalized) {
         console.log("Calculating similarity scores for products");
-        
+
         // Verify user embedding is valid
         if (!Array.isArray(userEmbedding) || userEmbedding.length === 0) {
           console.error("User embedding is not a valid array:", userEmbedding);
@@ -468,44 +490,61 @@ function ShopPageContent() {
           setProducts(filteredProducts);
           return;
         }
-        
+
         // Calculate similarity score for each product
-        const productsWithScore = filteredProducts.map(product => {
+        const productsWithScore = filteredProducts.map((product) => {
           const embedding = productEmbeddings[product.id];
           let similarityScore = 0;
-          
+
           if (embedding && Array.isArray(embedding) && embedding.length > 0) {
             try {
               similarityScore = cosineSimilarity(embedding, userEmbedding);
-              
+
               // Ensure score is valid
               if (isNaN(similarityScore) || !isFinite(similarityScore)) {
-                console.error(`Invalid similarity score for product ${product.id}:`, similarityScore);
+                console.error(
+                  `Invalid similarity score for product ${product.id}:`,
+                  similarityScore
+                );
                 similarityScore = 0;
               }
-              
-              console.log(`Product ${product.id} (${product.name}) score: ${similarityScore.toFixed(4)}`);
+
+              console.log(
+                `Product ${product.id} (${
+                  product.name
+                }) score: ${similarityScore.toFixed(4)}`
+              );
             } catch (err) {
-              console.error(`Error calculating similarity for product ${product.id}:`, err);
+              console.error(
+                `Error calculating similarity for product ${product.id}:`,
+                err
+              );
             }
           } else {
-            console.log(`No valid embedding for product ${product.id} (${product.name})`);
+            console.log(
+              `No valid embedding for product ${product.id} (${product.name})`
+            );
           }
-          
-          return { 
-            ...product, 
-            similarityScore: similarityScore 
+
+          return {
+            ...product,
+            similarityScore: similarityScore,
           };
         });
-        
+
         // Log score distribution for debugging
         const scoreDistribution = {
-          zero: productsWithScore.filter(p => p.similarityScore === 0).length,
-          low: productsWithScore.filter(p => p.similarityScore > 0 && p.similarityScore < 0.3).length,
-          medium: productsWithScore.filter(p => p.similarityScore >= 0.3 && p.similarityScore < 0.7).length,
-          high: productsWithScore.filter(p => p.similarityScore >= 0.7).length
+          zero: productsWithScore.filter((p) => p.similarityScore === 0).length,
+          low: productsWithScore.filter(
+            (p) => p.similarityScore > 0 && p.similarityScore < 0.3
+          ).length,
+          medium: productsWithScore.filter(
+            (p) => p.similarityScore >= 0.3 && p.similarityScore < 0.7
+          ).length,
+          high: productsWithScore.filter((p) => p.similarityScore >= 0.7)
+            .length,
         };
-        
+
         console.log("Score distribution:", scoreDistribution);
         // setDebugInfo(prev => prev + `\nScore distribution: ${JSON.stringify(scoreDistribution)}`);
         
@@ -515,7 +554,7 @@ function ShopPageContent() {
           const scoreB = b.similarityScore || 0;
           return scoreB - scoreA;
         });
-        
+
         setProducts(sortedProducts);
       } else {
         // No personalization, just use filtered products
@@ -537,10 +576,10 @@ function ShopPageContent() {
   const togglePersonalization = (): void => {
     setShowingPersonalized(!showingPersonalized);
   };
-  
+
   // Take the quiz button handler
   const handleTakeQuiz = (): void => {
-    router.push('/quiz');
+    router.push("/quiz");
   };
 
   return (
@@ -554,12 +593,14 @@ function ShopPageContent() {
         <div className="container mx-auto flex h-16 items-center justify-between px-6">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div 
+            <div
               className="flex items-center gap-2 cursor-pointer"
-              onClick={() => router.push('/')}
+              onClick={() => router.push("/")}
             >
               <ShoppingBag className="h-6 w-6 text-rose-500" />
-              <span className="text-xl font-bold text-gray-900">acquired.beauty</span>
+              <span className="text-xl font-bold text-gray-900">
+                acquired.beauty
+              </span>
             </div>
           </div>
 
@@ -568,22 +609,28 @@ function ShopPageContent() {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <span onClick={() => router.push('/')}>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <span onClick={() => router.push("/")}>
+                    <NavigationMenuLink
+                      className={navigationMenuTriggerStyle()}
+                    >
                       Home
                     </NavigationMenuLink>
                   </span>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link href="/shop" legacyBehavior passHref>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                    <NavigationMenuLink
+                      className={navigationMenuTriggerStyle()}
+                    >
                       Products
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link href="/quiz" legacyBehavior passHref>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                    <NavigationMenuLink
+                      className={navigationMenuTriggerStyle()}
+                    >
                       Beauty Quiz
                     </NavigationMenuLink>
                   </Link>
@@ -594,7 +641,11 @@ function ShopPageContent() {
 
           {/* Right side icons */}
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-gray-700 hover:text-rose-500">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-gray-700 hover:text-rose-500"
+            >
               <Link href="/wishlist">
                 <Heart className="h-5 w-5" />
               </Link>
@@ -616,10 +667,10 @@ function ShopPageContent() {
                     </SheetDescription>
                   </SheetHeader>
                   <div className="flex flex-col gap-4 py-4">
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       className="justify-start w-full"
-                      onClick={() => router.push('/')}
+                      onClick={() => router.push("/")}
                     >
                       Home
                     </Button>
@@ -645,17 +696,17 @@ function ShopPageContent() {
         {/* Only render this on client-side to prevent hydration mismatch */}
         {typeof window !== 'undefined' && comingFromQuiz && (
           <div className="mb-6">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="flex items-center gap-2"
-              onClick={() => router.push('/quiz')}
+              onClick={() => router.push("/quiz")}
             >
               <ArrowLeft size={16} />
               Back to Quiz
             </Button>
           </div>
         )}
-        
+
         {/* Header */}
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Blush Collection</h1>
@@ -674,10 +725,11 @@ function ShopPageContent() {
           ) : (
             // Default text for server-side rendering
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Discover perfect blush products curated just for your skin tone and preferences.
+              Discover perfect blush products curated just for your skin tone
+              and preferences.
             </p>
           )}
-          
+
           {/* User didn't take quiz yet - show CTA */}
           {!hasQuizData && !comingFromQuiz && (
             <div className="mt-6">
@@ -690,7 +742,7 @@ function ShopPageContent() {
               </Button>
             </div>
           )}
-          
+
           {/* Personalization toggle */}
           {hasQuizData && (
             <div className="mt-4">
@@ -698,13 +750,22 @@ function ShopPageContent() {
                 onClick={togglePersonalization}
                 className={`
                   flex items-center gap-2 mx-auto px-4 py-2 rounded-full text-sm font-medium transition-all
-                  ${showingPersonalized 
-                    ? 'bg-rose-500 text-white shadow-md' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                  ${
+                    showingPersonalized
+                      ? "bg-rose-500 text-white shadow-md"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }
                 `}
               >
-                <Sparkles size={16} className={showingPersonalized ? "text-yellow-300" : "text-gray-500"} />
-                {showingPersonalized ? 'Showing Personalized Results' : 'Show Personalized Results'}
+                <Sparkles
+                  size={16}
+                  className={
+                    showingPersonalized ? "text-yellow-300" : "text-gray-500"
+                  }
+                />
+                {showingPersonalized
+                  ? "Showing Personalized Results"
+                  : "Show Personalized Results"}
               </button>
             </div>
           )}
@@ -723,7 +784,10 @@ function ShopPageContent() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Search size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                <Search
+                  size={18}
+                  className="absolute left-3 top-3.5 text-gray-400"
+                />
               </form>
             </div>
           </div>
@@ -734,7 +798,9 @@ function ShopPageContent() {
           <div className="flex justify-center items-center p-10 bg-white rounded-xl shadow-md mb-10">
             <div className="flex flex-col items-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-500 mb-4"></div>
-              <p className="text-gray-700">Personalizing your recommendations...</p>
+              <p className="text-gray-700">
+                Personalizing your recommendations...
+              </p>
             </div>
           </div>
         )}
@@ -747,8 +813,8 @@ function ShopPageContent() {
         ) : error ? (
           <div className="text-center p-10 bg-white rounded-xl shadow-md">
             <p className="text-red-500">{error}</p>
-            <Button 
-              onClick={() => window.location.reload()} 
+            <Button
+              onClick={() => window.location.reload()}
               className="mt-4 bg-rose-500 hover:bg-rose-600"
             >
               Try Again
@@ -756,16 +822,22 @@ function ShopPageContent() {
           </div>
         ) : products.length === 0 ? (
           <div className="text-center p-10 bg-white rounded-xl shadow-md">
-            <p className="text-gray-600">No products found. Try a different search.</p>
+            <p className="text-gray-600">
+              No products found. Try a different search.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((product) => (
-              <div 
-                key={product.id} 
+              <div
+                key={product.id}
                 className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
               >
-                <a href={product.link || '#'} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={product.link || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {/* Product Image */}
                   <div className="relative h-56 bg-gray-100">
                     {product.image ? (
@@ -786,9 +858,9 @@ function ShopPageContent() {
                         <ShoppingBag size={40} className="text-gray-300" />
                       </div>
                     )}
-                    
+
                     {/* Wishlist button */}
-                    <button 
+                    <button
                       className="absolute top-3 right-3 p-2 rounded-full bg-white/80 hover:bg-white shadow-sm hover:shadow transition-all"
                       onClick={(e) => {
                         e.stopPropagation(); // Prevent triggering the parent onClick
@@ -796,61 +868,90 @@ function ShopPageContent() {
                         // Add wishlist functionality here
                       }}
                     >
-                      <Heart size={18} className="text-gray-500 hover:text-rose-500" />
+                      <Heart
+                        size={18}
+                        className="text-gray-500 hover:text-rose-500"
+                      />
                     </button>
-                    
+
                     {/* Match score indicator - show more prominently if coming from quiz */}
-                    {(showingPersonalized || comingFromQuiz) && product.similarityScore !== undefined && (
-                      <div className={`
+                    {(showingPersonalized || comingFromQuiz) &&
+                      product.similarityScore !== undefined && (
+                        <div
+                          className={`
                         absolute bottom-3 left-3 px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1 shadow-sm
-                        ${product.similarityScore > 0.01 
-                          ? comingFromQuiz 
-                            ? 'bg-rose-500 text-white' 
-                            : 'bg-white/90 text-rose-500'
-                          : 'bg-gray-300 text-gray-700'
+                        ${
+                          product.similarityScore > 0.01
+                            ? comingFromQuiz
+                              ? "bg-rose-500 text-white"
+                              : "bg-white/90 text-rose-500"
+                            : "bg-gray-300 text-gray-700"
                         }`}
-                      >
-                        <Sparkles size={12} className={product.similarityScore > 0.01 && comingFromQuiz ? "text-yellow-300" : ""} />
-                        {product.similarityScore > 0.01 
-                          ? `${Math.round(product.similarityScore * 100)}% Match` 
-                          : 'No Match'}
-                      </div>
-                    )}
+                        >
+                          <Sparkles
+                            size={12}
+                            className={
+                              product.similarityScore > 0.01 && comingFromQuiz
+                                ? "text-yellow-300"
+                                : ""
+                            }
+                          />
+                          {product.similarityScore > 0.01
+                            ? `${Math.round(
+                                product.similarityScore * 100
+                              )}% Match`
+                            : "No Match"}
+                        </div>
+                      )}
                   </div>
 
                   {/* Product details */}
                   <div className="p-4">
                     {/* Brand */}
-                    <p className="text-xs text-gray-500 mb-1 uppercase">{product.brand}</p>
-                    
+                    <p className="text-xs text-gray-500 mb-1 uppercase">
+                      {product.brand}
+                    </p>
+
                     {/* Name */}
-                    <h3 className="font-medium text-gray-900 mb-1 truncate">{product.name}</h3>
-                    
+                    <h3 className="font-medium text-gray-900 mb-1 truncate">
+                      {product.name}
+                    </h3>
+
                     {/* Rating */}
                     <div className="flex items-center mb-2">
                       <div className="flex items-center">
                         {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            size={14} 
-                            className={i < Math.round(product.rating || 0) ? "text-amber-400 fill-amber-400" : "text-gray-300"} 
+                          <Star
+                            key={i}
+                            size={14}
+                            className={
+                              i < Math.round(product.rating || 0)
+                                ? "text-amber-400 fill-amber-400"
+                                : "text-gray-300"
+                            }
                           />
                         ))}
                       </div>
-                      <span className="text-xs text-gray-500 ml-1">({product.rating ? product.rating.toFixed(1) : 'N/A'})</span>
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({product.rating ? product.rating.toFixed(1) : "N/A"})
+                      </span>
                     </div>
-                    
+
                     {/* Color if available */}
                     {product.color && (
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs text-gray-600">Color:</span>
-                        <span className="text-xs font-medium">{product.color}</span>
+                        <span className="text-xs font-medium">
+                          {product.color}
+                        </span>
                       </div>
                     )}
-                    
+
                     {/* Price */}
                     <div className="flex items-center mt-2">
-                      <span className="font-bold text-gray-900">${product.price}</span>
+                      <span className="font-bold text-gray-900">
+                        ${product.price}
+                      </span>
                     </div>
                   </div>
                 </a>
