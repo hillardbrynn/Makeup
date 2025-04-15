@@ -331,7 +331,7 @@ function ShopPageContent() {
             
             // Generate embedding from answers
             const timestamp = new Date().getTime();
-            fetch(`${process.env.API_LINK}generate-embedding?t=${timestamp}`, {
+            fetch(`https://acquired-beauty-backend-hu4zz8pbu-pranav-chatis-projects.vercel.app/generate-embedding?t=${timestamp}`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
