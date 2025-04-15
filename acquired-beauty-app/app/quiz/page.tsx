@@ -341,7 +341,11 @@ export default function QuizPage() {
             setDebugInfo(prev => prev + `\nVerified embedding in storage: length=${parsed.length}`);
           } catch (err) {
             console.error('Error parsing stored embedding:', err);
-            setDebugInfo(prev => prev + `\nError verifying stored embedding: ${(err as Error).message}`);
+            if (err instanceof Error) {
+              setDebugInfo(prev => prev + `\nError verifying stored embedding: ${err.message}`);
+            } else {
+              setDebugInfo(prev => prev + `\nError verifying stored embedding: ${String(err)}`);
+            }
           }
         }
         
