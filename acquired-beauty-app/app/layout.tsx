@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+// import { useState, useEffect } from 'react';
+// import { usePathname, useRouter } from 'next/navigation';
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import supabase from '@/lib/supabase'; // Make sure to update the path
-import { User } from '@supabase/supabase-js'; // Import the User type
+// import supabase from '@/lib/supabase'; // Make sure to update the path
+// import { User } from '@supabase/supabase-js'; // Import the User type
 
 // Fonts
 const geistSans = Geist({
@@ -20,10 +20,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Define which routes require authentication
-const protectedRoutes = ['/dashboard', '/recommendations'];
-// Define public routes that should redirect if user is already logged in
-const authRoutes = ['/auth'];
+// // Define which routes require authentication
+// const protectedRoutes = ['/dashboard', '/recommendations'];
+// // Define public routes that should redirect if user is already logged in
+// const authRoutes = ['/auth'];
 
 export default function RootLayout({
   children,

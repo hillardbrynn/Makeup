@@ -1,26 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { 
   Heart, 
   ShoppingBag, 
-  Filter, 
   Search, 
   Star, 
   Sparkles,
   Menu,
-  Users,
   ArrowLeft
 } from 'lucide-react';
 import {
   NavigationMenu,
-  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import {
@@ -54,19 +50,14 @@ interface BlushProduct {
 
 interface BlushEmbedding {
   blush_id: number;
-  embedding: number[];
+  embedding: number[] | string | Record<string, number>;
 }
 
-export default function ShopPage() {
-  const getProxiedImageUrl = (originalUrl?: string): string => {
-    if (!originalUrl) return "/placeholder-product.png";
-    return `/api/image?url=${encodeURIComponent(originalUrl)}`;
-  };
-  
+// Create a client component for the content that uses useSearchParams
+function ShopPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const comingFromQuiz = searchParams?.get('personalized') === 'true';
   
+  // State variables
   const [products, setProducts] = useState<BlushProduct[]>([]);
   const [allProducts, setAllProducts] = useState<BlushProduct[]>([]);
   const [productEmbeddings, setProductEmbeddings] = useState<Record<number, number[]>>({});
@@ -74,15 +65,78 @@ export default function ShopPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [userEmbedding, setUserEmbedding] = useState<number[] | null>(null);
-  const [showingPersonalized, setShowingPersonalized] = useState<boolean>(comingFromQuiz);
+  const [showingPersonalized, setShowingPersonalized] = useState<boolean>(false);
   const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [comingFromQuiz, setComingFromQuiz] = useState<boolean>(false);
+  
+  // Initialize client-side values that depend on window/sessionStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Set up URL params
+      const searchParams = new URLSearchParams(window.location.search);
+      const isFromQuiz = searchParams.get('personalized') === 'true';
+      setComingFromQuiz(isFromQuiz);
+      setShowingPersonalized(isFromQuiz);
+    }
+  }, []);
+  
+  // This function can be useful if you need to proxy external images
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+  const getProxiedImageUrl = (originalUrl?: string): string => {
+    if (!originalUrl) return "/placeholder-product.png";
+    return `/api/image?url=${encodeURIComponent(originalUrl)}`;
+  };
 
-  // Replace the cosineSimilarity function with this improved version
+  // Helper function to calculate the actual similarity once we know the arrays are valid
+  const calculateSimilarity = useCallback((vecA: number[], vecB: number[]): number => {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    let validDimensions = 0;
+    
+    for (let i = 0; i < vecA.length; i++) {
+      // Make sure values are numbers
+      const a = Number(vecA[i]);
+      const b = Number(vecB[i]);
+      
+      if (isNaN(a) || isNaN(b) || !isFinite(a) || !isFinite(b)) {
+        console.error(`Non-numeric or infinite values at index ${i}: ${vecA[i]}, ${vecB[i]}`);
+        continue;
+      }
+      
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
+      validDimensions++;
+    }
+    
+    // Check if we have any valid dimensions
+    if (validDimensions === 0) {
+      console.warn('No valid dimensions found for similarity calculation');
+      return 0;
+    }
+    
+    if (normA <= 0 || normB <= 0) {
+      console.warn('Zero norm detected', { normA, normB });
+      return 0;
+    }
+    
+    const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    
+    // Verify the result is valid
+    if (isNaN(similarity) || !isFinite(similarity)) {
+      console.error('Invalid similarity result:', similarity);
+      return 0;
+    }
+    
+    // Clamp to valid range
+    return Math.max(-1, Math.min(1, similarity));
+  }, []);
 
   // Improved cosine similarity function with robust error handling
-  function cosineSimilarity(vecA: any, vecB: any): number {
+  const cosineSimilarity = useCallback((vecA: number[] | unknown, vecB: number[] | unknown): number => {
     try {
       // Check if both are arrays
       if (!Array.isArray(vecA) || !Array.isArray(vecB)) {
@@ -97,7 +151,7 @@ export default function ShopPage() {
         if (typeof vecA === 'string') {
           try {
             vecA = JSON.parse(vecA);
-          } catch (e) {
+          } catch {
             console.error('Failed to parse vecA as JSON');
           }
         }
@@ -105,7 +159,7 @@ export default function ShopPage() {
         if (typeof vecB === 'string') {
           try {
             vecB = JSON.parse(vecB);
-          } catch (e) {
+          } catch {
             console.error('Failed to parse vecB as JSON');
           }
         }
@@ -116,74 +170,42 @@ export default function ShopPage() {
         }
       }
       
+      // At this point we know vecA and vecB are arrays
+      const vecArrayA = vecA as number[];
+      const vecArrayB = vecB as number[];
+      
       // Check for empty arrays
-      if (vecA.length === 0 || vecB.length === 0) {
+      if (vecArrayA.length === 0 || vecArrayB.length === 0) {
         console.warn('Empty vector detected');
         return 0;
       }
       
       // Check if dimensions match
-      if (vecA.length !== vecB.length) {
-        console.warn(`Vector length mismatch: vecA=${vecA.length}, vecB=${vecB.length}`);
+      if (vecArrayA.length !== vecArrayB.length) {
+        console.warn(`Vector length mismatch: vecA=${vecArrayA.length}, vecB=${vecArrayB.length}`);
         
         // If one is longer, truncate to match the shorter one
-        const minLength = Math.min(vecA.length, vecB.length);
-        vecA = vecA.slice(0, minLength);
-        vecB = vecB.slice(0, minLength);
+        const minLength = Math.min(vecArrayA.length, vecArrayB.length);
+        const vecATruncated = vecArrayA.slice(0, minLength);
+        const vecBTruncated = vecArrayB.slice(0, minLength);
         
         console.log(`Truncated vectors to length ${minLength}`);
-      }
-      
-      let dotProduct = 0;
-      let normA = 0;
-      let normB = 0;
-      let validDimensions = 0;
-      
-      for (let i = 0; i < vecA.length; i++) {
-        // Make sure values are numbers
-        const a = Number(vecA[i]);
-        const b = Number(vecB[i]);
         
-        if (isNaN(a) || isNaN(b) || !isFinite(a) || !isFinite(b)) {
-          console.error(`Non-numeric or infinite values at index ${i}: ${vecA[i]}, ${vecB[i]}`);
-          continue;
-        }
-        
-        dotProduct += a * b;
-        normA += a * a;
-        normB += b * b;
-        validDimensions++;
+        // Now use the truncated arrays
+        return calculateSimilarity(vecATruncated, vecBTruncated);
       }
       
-      // Check if we have any valid dimensions
-      if (validDimensions === 0) {
-        console.warn('No valid dimensions found for similarity calculation');
-        return 0;
-      }
+      // If dimensions match, calculate similarity
+      return calculateSimilarity(vecArrayA, vecArrayB);
       
-      if (normA <= 0 || normB <= 0) {
-        console.warn('Zero norm detected', { normA, normB });
-        return 0;
-      }
-      
-      const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-      
-      // Verify the result is valid
-      if (isNaN(similarity) || !isFinite(similarity)) {
-        console.error('Invalid similarity result:', similarity);
-        return 0;
-      }
-      
-      // Clamp to valid range
-      return Math.max(-1, Math.min(1, similarity));
     } catch (error) {
       console.error('Error in cosineSimilarity calculation:', error);
       return 0;
     }
-  }
+  }, [calculateSimilarity]);
 
   // Add this function to help parse embeddings that might be stored in different formats
-  function parseEmbedding(embedding: any): number[] {
+  const parseEmbedding = useCallback((embedding: unknown): number[] => {
     if (Array.isArray(embedding)) {
       return embedding;
     }
@@ -195,7 +217,7 @@ export default function ShopPage() {
         if (Array.isArray(parsed)) {
           return parsed;
         }
-      } catch (e) {
+      } catch {
         console.error('Failed to parse embedding as JSON string', embedding);
       }
     }
@@ -204,30 +226,33 @@ export default function ShopPage() {
       // It might be a Postgres array type returned from Supabase
       // Let's try to extract the values
       try {
-        const values = Object.values(embedding);
+        const values = Object.values(embedding as Record<string, number>);
         if (values.length > 0 && !isNaN(Number(values[0]))) {
           return values.map(v => Number(v));
         }
-      } catch (e) {
+      } catch {
         console.error('Failed to extract values from embedding object', embedding);
       }
     }
     
     console.error('Could not parse embedding', embedding);
     return [];
-  }
+  }, []);
   
 
   // Replace the useEffect that gets the embedding from sessionStorage
-
   useEffect(() => {
+    // Don't execute this on the server
+    if (typeof window === 'undefined') return;
+    
     const getEmbedding = () => {
       try {
         setLoadingEmbedding(true);
         
         // Get URL parameters
-        const fromQuiz = searchParams?.get('personalized') === 'true';
-        const timestamp = searchParams?.get('t') || 'none';
+        const searchParams = new URLSearchParams(window.location.search);
+        const fromQuiz = searchParams.get('personalized') === 'true';
+        const timestamp = searchParams.get('t') || 'none';
         
         console.log("🔍 DEBUG: Loading embedding from sessionStorage", { 
           fromQuiz, 
@@ -347,12 +372,13 @@ export default function ShopPage() {
     
     // Call the function
     getEmbedding();
-  }, [comingFromQuiz, searchParams]);
-
-  // Replace the entire fetch data function with this version:
+  }, []); // No dependencies, run once after mount on client side
 
   // Fetch blush products and embeddings
   useEffect(() => {
+    // Don't run this effect during server-side rendering
+    if (typeof window === 'undefined') return;
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -416,9 +442,7 @@ export default function ShopPage() {
     };
     
     fetchData();
-  }, []);
-
-  // Replace the useEffect that applies filters and sorting (around line 331-390)
+  }, [parseEmbedding]);
 
   // Apply filters and sorting based on user embedding
   useEffect(() => {
@@ -504,9 +528,9 @@ export default function ShopPage() {
       console.error('Error applying filters:', err);
       setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
       // Fallback to original products if error occurs
-      setProducts(filteredProducts);
+      setProducts(allProducts);
     }
-  }, [allProducts, searchQuery, userEmbedding, showingPersonalized, productEmbeddings]);
+  }, [allProducts, searchQuery, userEmbedding, showingPersonalized, productEmbeddings, cosineSimilarity]);
 
   const handleSearch = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -619,10 +643,10 @@ export default function ShopPage() {
           </div>
         </div>
       </header>
-      {/* <div className="h-10 w-full items-center bg-gradient-to-r from-rose-500 to-rose-400 justify-between"></div> */}
+      
       <div className="relative z-10 container mx-auto px-6 py-10">
-        {/* Show "Back to Quiz" button if coming from quiz */}
-        {comingFromQuiz && (
+        {/* Only render this on client-side to prevent hydration mismatch */}
+        {typeof window !== 'undefined' && comingFromQuiz && (
           <div className="mb-6">
             <Button 
               variant="outline" 
@@ -639,12 +663,19 @@ export default function ShopPage() {
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Blush Collection</h1>
           
-          {/* Show personalized message if coming from quiz */}
-          {comingFromQuiz ? (
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Here are your personalized blush recommendations based on your beauty quiz results!
-            </p>
+          {/* Show personalized message if coming from quiz, but only on client */}
+          {typeof window !== 'undefined' ? (
+            comingFromQuiz ? (
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Here are your personalized blush recommendations based on your beauty quiz results!
+              </p>
+            ) : (
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Discover perfect blush products curated just for your skin tone and preferences.
+              </p>
+            )
           ) : (
+            // Default text for server-side rendering
             <p className="text-gray-600 max-w-2xl mx-auto">
               Discover perfect blush products curated just for your skin tone and preferences.
             </p>
@@ -742,15 +773,14 @@ export default function ShopPage() {
                   <div className="relative h-56 bg-gray-100">
                     {product.image ? (
                       <div className="relative w-full h-full">
-                        <img 
-                          src={product.image} 
+                        {/* Using regular img tag to avoid Next.js image domain configuration issues */}
+                        <img
+                          src={product.image}
                           alt={product.name || "Blush Product"}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            console.error(`Error loading image for ${product.name}:`, e);
                             target.src = "/placeholder-product.png";
-                            target.onerror = null;
                           }}
                         />
                       </div>
@@ -856,5 +886,18 @@ export default function ShopPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Main page component that wraps the content with Suspense
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-rose-500"></div>
+      </div>
+    }>
+      <ShopPageContent />
+    </Suspense>
   );
 }
