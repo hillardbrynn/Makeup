@@ -289,8 +289,8 @@ function ShopPageContent() {
             });
             
             // Get profile info if available
-            const profileStr = sessionStorage.getItem('quiz_profile');
-            const profile = profileStr ? JSON.parse(profileStr) : null;
+            // const profileStr = sessionStorage.getItem('quiz_profile');
+            // const profile = profileStr ? JSON.parse(profileStr) : null;
             
             // setDebugInfo(prev => prev + `\n✅ Found embedding with length: ${embedding.length}, non-zero values: ${nonZeroCount}, sum: ${embeddingSum.toFixed(4)}`);
             // if (profile) {
