@@ -71,7 +71,7 @@ function ShopPageContent() {
   const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
   // We'll keep this commented out since it's not being used
-// const [debugInfo, setDebugInfo] = useState<string>(''); 
+  const [debugInfo, setDebugInfo] = useState<string>(''); 
 
   // Replace the cosineSimilarity function with this improved version
 
