@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import Image from 'next/image'; // Import Next.js Image component
+// import Image from 'next/image'; // Import Next.js Image component
 import { 
   Heart, 
   ShoppingBag, 
@@ -69,7 +69,7 @@ function ShopPageContent() {
   const [showingPersonalized, setShowingPersonalized] = useState<boolean>(false);
   const [loadingEmbedding, setLoadingEmbedding] = useState<boolean>(false);
   const [hasQuizData, setHasQuizData] = useState<boolean>(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  // const [debugInfo, setDebugInfo] = useState<string>('');
   const [comingFromQuiz, setComingFromQuiz] = useState<boolean>(false);
   
   // Initialize client-side values that depend on window/sessionStorage
@@ -243,7 +243,6 @@ function ShopPageContent() {
 
   // Replace the useEffect that gets the embedding from sessionStorage
   useEffect(() => {
-    // Don't execute this on the server
     if (typeof window === 'undefined') return;
     
     const getEmbedding = () => {
@@ -262,7 +261,7 @@ function ShopPageContent() {
         });
         
         // Clear any debug info
-        setDebugInfo('');
+        // setDebugInfo('');
         
         // Try to get the embedding from sessionStorage
         const embeddingStr = sessionStorage.getItem('quiz_embedding');
@@ -272,7 +271,7 @@ function ShopPageContent() {
             
             if (!Array.isArray(embedding)) {
               console.error("🚨 ERROR: Embedding is not an array:", embedding);
-              setDebugInfo(prev => prev + "\n🚨 ERROR: Embedding is not an array");
+              // setDebugInfo(prev => prev + "\n🚨 ERROR: Embedding is not an array");
               setLoadingEmbedding(false);
               return;
             }
@@ -293,10 +292,10 @@ function ShopPageContent() {
             const profileStr = sessionStorage.getItem('quiz_profile');
             const profile = profileStr ? JSON.parse(profileStr) : null;
             
-            setDebugInfo(prev => prev + `\n✅ Found embedding with length: ${embedding.length}, non-zero values: ${nonZeroCount}, sum: ${embeddingSum.toFixed(4)}`);
-            if (profile) {
-              setDebugInfo(prev => prev + `\n👤 Profile: ${profile.summary || JSON.stringify(profile.answers)}`);
-            }
+            // setDebugInfo(prev => prev + `\n✅ Found embedding with length: ${embedding.length}, non-zero values: ${nonZeroCount}, sum: ${embeddingSum.toFixed(4)}`);
+            // if (profile) {
+            //   setDebugInfo(prev => prev + `\n👤 Profile: ${profile.summary || JSON.stringify(profile.answers)}`);
+            // }
             
             // Store the embedding for use in recommendations
             setUserEmbedding(embedding);
@@ -308,17 +307,17 @@ function ShopPageContent() {
             }
           } catch (err) {
             console.error("🚨 Error parsing embedding JSON:", err);
-            setDebugInfo(prev => prev + "\n🚨 Error parsing embedding JSON");
+            // setDebugInfo(prev => prev + "\n🚨 Error parsing embedding JSON");
           }
         } else {
           console.log("⚠️ No embedding found in sessionStorage");
-          setDebugInfo(prev => prev + "\n⚠️ No embedding found in sessionStorage");
+          // setDebugInfo(prev => prev + "\n⚠️ No embedding found in sessionStorage");
           
           // Check for quiz answers as fallback
           const quizAnswers = sessionStorage.getItem('quiz_answers');
           if (quizAnswers) {
             console.log("🔄 Found quiz answers, generating embedding");
-            setDebugInfo(prev => prev + "\n🔄 Found quiz answers, generating embedding");
+            // setDebugInfo(prev => prev + "\n🔄 Found quiz answers, generating embedding");
             
             // Generate embedding from answers
             const timestamp = new Date().getTime();
@@ -343,7 +342,7 @@ function ShopPageContent() {
                   sample: data.embedding.slice(0, 5)
                 });
                 
-                setDebugInfo(prev => prev + `\n✅ Generated new embedding with length: ${data.embedding.length}`);
+                // setDebugInfo(prev => prev + `\n✅ Generated new embedding with length: ${data.embedding.length}`);
                 setUserEmbedding(data.embedding);
                 setHasQuizData(true);
                 sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
@@ -353,12 +352,12 @@ function ShopPageContent() {
                 }
               } else {
                 console.error("🚨 Invalid embedding received:", data);
-                setDebugInfo(prev => prev + "\n🚨 Invalid embedding received from API");
+                // setDebugInfo(prev => prev + "\n🚨 Invalid embedding received from API");
               }
             })
             .catch(err => {
               console.error("🚨 Error generating embedding:", err);
-              setDebugInfo(prev => prev + `\n🚨 Error generating embedding: ${err.message}`);
+              // setDebugInfo(prev => prev + `\n🚨 Error generating embedding: ${err.message}`);
             });
           }
         }
@@ -366,7 +365,7 @@ function ShopPageContent() {
         setLoadingEmbedding(false);
       } catch (err) {
         console.error("🚨 Error getting embedding:", err);
-        setDebugInfo(prev => prev + `\n🚨 Error getting embedding: ${err instanceof Error ? err.message : String(err)}`);
+        // setDebugInfo(prev => prev + `\n🚨 Error getting embedding: ${err instanceof Error ? err.message : String(err)}`);
         setLoadingEmbedding(false);
       }
     };
@@ -465,7 +464,7 @@ function ShopPageContent() {
         // Verify user embedding is valid
         if (!Array.isArray(userEmbedding) || userEmbedding.length === 0) {
           console.error("User embedding is not a valid array:", userEmbedding);
-          setDebugInfo(prev => prev + "\nERROR: User embedding is not a valid array");
+          // setDebugInfo(prev => prev + "\nERROR: User embedding is not a valid array");
           setProducts(filteredProducts);
           return;
         }
@@ -508,7 +507,7 @@ function ShopPageContent() {
         };
         
         console.log("Score distribution:", scoreDistribution);
-        setDebugInfo(prev => prev + `\nScore distribution: ${JSON.stringify(scoreDistribution)}`);
+        // setDebugInfo(prev => prev + `\nScore distribution: ${JSON.stringify(scoreDistribution)}`);
         
         // Sort by similarity score (highest first)
         const sortedProducts = [...productsWithScore].sort((a, b) => {
@@ -524,7 +523,7 @@ function ShopPageContent() {
       }
     } catch (err) {
       console.error('Error applying filters:', err);
-      setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
+      // setDebugInfo(prev => prev + `\nError applying filters: ${err instanceof Error ? err.message : String(err)}`);
       // Fallback to original products if error occurs
       setProducts(allProducts);
     }
