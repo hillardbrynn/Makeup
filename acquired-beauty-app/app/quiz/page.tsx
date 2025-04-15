@@ -207,6 +207,8 @@ export default function QuizPage() {
       }
     };
 
+    // Replace the handleSubmit function in your QuizPage component
+
     const handleSubmit = async () => {
       // For the last question if it's multi-select
       if (quizQuestions[currentQuestion].multiSelect) {
@@ -261,11 +263,15 @@ export default function QuizPage() {
           }
         }
         
+        // Clear existing embeddings before creating new ones
+        sessionStorage.removeItem('quiz_embedding');
+        
         console.log("Generating embedding for:", formattedAnswers);
         setDebugInfo(prev => prev + `\nGenerating embedding for quiz answers: ${JSON.stringify(formattedAnswers)}`);
         
         // Send to backend to generate embedding (without storing)
-        const apiUrl = 'http://localhost:8000/generate-embedding';
+        const timestamp = new Date().getTime();
+        const apiUrl = `${process.env.API_LINK}generate-embedding?t=${timestamp}`;
         console.log(`Calling API: ${apiUrl}`);
         setDebugInfo(prev => prev + `\nCalling API: ${apiUrl}`);
         
@@ -273,6 +279,8 @@ export default function QuizPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
           },
           body: JSON.stringify(formattedAnswers),
         });
@@ -288,26 +296,62 @@ export default function QuizPage() {
         }
         
         const data = await response.json();
-        console.log('Embedding generated successfully', data);
-        setDebugInfo(prev => prev + `\nEmbedding generated successfully with length: ${data.embedding?.length || 'unknown'}`);
+        
+        // Validate embedding data
+        if (!data.embedding || !Array.isArray(data.embedding)) {
+          console.error('Invalid embedding response:', data);
+          setDebugInfo(prev => prev + `\nInvalid embedding response: ${JSON.stringify(data)}`);
+          throw new Error('Server returned invalid embedding data');
+        }
+        
+        console.log('Embedding generated successfully', {
+          length: data.embedding.length,
+          sample: data.embedding.slice(0, 5),
+          meta: data.meta
+        });
+        
+        setDebugInfo(prev => prev + `\nEmbedding generated successfully with length: ${data.embedding.length}`);
+        setDebugInfo(prev => prev + `\nNon-zero values: ${data.meta?.nonzero_values || 'unknown'}`);
+        
+        // Store answers and profile information for debugging
+        const profile = {
+          answers: formattedAnswers,
+          timestamp: new Date().toISOString(),
+          // Add basic profile information for easier debugging
+          summary: `Skin: ${formattedAnswers.skin_tone}/${formattedAnswers.under_tone}, Style: ${formattedAnswers.makeup_style}`
+        };
         
         // Store the embedding in sessionStorage for the shop page to access
-        if (data.embedding) {
-          sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
-          
-          // Also store raw answers as fallback
-          sessionStorage.setItem('quiz_answers', JSON.stringify(formattedAnswers));
-          
-          setCompleted(true);
-          
-          // Wait a moment before redirecting to shop page
-          setTimeout(() => {
-            setIsRedirecting(true);
-            router.push('/shop?personalized=true');
-          }, 2000);
-        } else {
-          throw new Error('No embedding returned from server');
+        sessionStorage.setItem('quiz_embedding', JSON.stringify(data.embedding));
+        sessionStorage.setItem('quiz_answers', JSON.stringify(formattedAnswers));
+        sessionStorage.setItem('quiz_profile', JSON.stringify(profile));
+        
+        console.log('Stored quiz data in sessionStorage');
+        setDebugInfo(prev => prev + `\nStored quiz data in sessionStorage`);
+        
+        // Verify what was stored
+        const storedEmbedding = sessionStorage.getItem('quiz_embedding');
+        if (storedEmbedding) {
+          try {
+            const parsed = JSON.parse(storedEmbedding);
+            console.log('Successfully stored embedding:', {
+              length: parsed.length,
+              sample: parsed.slice(0, 5)
+            });
+            setDebugInfo(prev => prev + `\nVerified embedding in storage: length=${parsed.length}`);
+          } catch (err) {
+            console.error('Error parsing stored embedding:', err);
+            setDebugInfo(prev => prev + `\nError verifying stored embedding: ${err.message}`);
+          }
         }
+        
+        setCompleted(true);
+        
+        // Wait a moment before redirecting to shop page
+        setTimeout(() => {
+          setIsRedirecting(true);
+          router.push(`/shop?personalized=true&t=${timestamp}`);
+        }, 2000);
       } catch (err) {
         console.error('Error submitting quiz:', err);
         setDebugInfo(prev => prev + `\nError submitting quiz: ${err instanceof Error ? err.message : String(err)}`);
