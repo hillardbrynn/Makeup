@@ -271,7 +271,7 @@ export default function QuizPage() {
         
         // Send to backend to generate embedding (without storing)
         const timestamp = new Date().getTime();
-        const apiUrl = `${process.env.API_LINK}generate-embedding?t=${timestamp}`;
+        const apiUrl = `https://acquired-beauty-backend-hu4zz8pbu-pranav-chatis-projects.vercel.app/generate-embedding?t=${timestamp}`;
         console.log(`Calling API: ${apiUrl}`);
         setDebugInfo(prev => prev + `\nCalling API: ${apiUrl}`);
         
