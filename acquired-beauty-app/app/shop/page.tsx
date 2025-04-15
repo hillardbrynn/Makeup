@@ -290,7 +290,7 @@ function ShopPageContent() {
             
             // Generate embedding from answers
             const timestamp = new Date().getTime();
-            fetch(`http://localhost:8000/generate-embedding?t=${timestamp}`, {
+            fetch(`${process.env.API_LINK}generate-embedding?t=${timestamp}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

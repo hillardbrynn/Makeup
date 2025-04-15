@@ -271,7 +271,7 @@ export default function QuizPage() {
         
         // Send to backend to generate embedding (without storing)
         const timestamp = new Date().getTime();
-        const apiUrl = `http://localhost:8000/generate-embedding?t=${timestamp}`;
+        const apiUrl = `${process.env.API_LINK}generate-embedding?t=${timestamp}`;
         console.log(`Calling API: ${apiUrl}`);
         setDebugInfo(prev => prev + `\nCalling API: ${apiUrl}`);
         
